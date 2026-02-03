@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-950 text-dark-100 font-sans antialiased;
+  }
+  
+  * {
+    @apply scrollbar-thin scrollbar-thumb-dark-700 scrollbar-track-dark-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-dark-900;
+  }
+  
+  .btn-secondary {
+    @apply px-4 py-2 bg-dark-800 hover:bg-dark-700 text-dark-100 font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-dark-600 focus:ring-offset-2 focus:ring-offset-dark-900;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-100 placeholder-dark-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
+  }
+  
+  .card {
+    @apply bg-dark-900 rounded-lg border border-dark-800 shadow-card;
+  }
+  
+  .card-hover {
+    @apply hover:shadow-card-hover hover:border-dark-700 transition-all duration-200;
+  }
+}
+
+/* Custom scrollbar styles */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thumb-dark-700::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 3px;
+}
+
+.scrollbar-track-dark-900::-webkit-scrollbar-track {
+  background-color: #0f172a;
+}

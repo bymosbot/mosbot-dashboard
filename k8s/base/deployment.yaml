@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosbot-dashboard
+  namespace: mosbot
+  labels:
+    app: mosbot-dashboard
+    component: frontend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: mosbot-dashboard
+  template:
+    metadata:
+      labels:
+        app: mosbot-dashboard
+        component: frontend
+    spec:
+      containers:
+        - name: dashboard
+          image: ghcr.io/mosufy/mosbot-dashboard:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: mosbot-dashboard-config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
