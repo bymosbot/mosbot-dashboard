@@ -1,0 +1,13 @@
+---
+description: Brand and UI style guide for the dashboard
+alwaysApply: false
+---
+
+# Brand and Styling Guide
+
+- Maintain the dark theme baseline: `bg-dark-950`, `text-dark-100`, muted text with `text-dark-400/500`.
+- Use the `Inter` font family; do not introduce new fonts.
+- Prefer consistent rounded corners and soft shadows (`rounded-lg`, `shadow-card`).
+- Primary actions use the existing `btn-primary` styling and `primary-600/700` palette.
+- Secondary actions use `btn-secondary` and dark palette classes.
+- Keep spacing consistent with current layouts (gap-3/4/6, padding 4/6).

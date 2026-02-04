@@ -1,0 +1,11 @@
+---
+description: Tailwind styling and shared CSS utilities
+alwaysApply: false
+---
+
+# Tailwind Styling
+
+- Prefer Tailwind utility classes in JSX; add shared classes in `src/index.css` only when reused.
+- Use `@layer base` and `@layer components` to define global and reusable styles.
+- Reuse existing utility classes (`btn-primary`, `btn-secondary`, `input-field`, `card`) before adding new ones.
+- Keep colors consistent with the dark theme palette and existing class names.

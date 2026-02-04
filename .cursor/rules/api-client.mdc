@@ -1,0 +1,11 @@
+---
+description: Axios client usage and API conventions
+alwaysApply: false
+---
+
+# API Client Conventions
+
+- Use the shared `api` instance from `src/api/client.js` instead of creating new axios clients.
+- Keep the base URL sourced from `VITE_API_URL` with a safe local default.
+- Add auth headers via the request interceptor rather than per-call duplication.
+- Log and rethrow errors in the response interceptor; avoid silent failures.

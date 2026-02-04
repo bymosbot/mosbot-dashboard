@@ -1,0 +1,12 @@
+---
+description: Zustand store patterns for tasks and async state
+alwaysApply: false
+---
+
+# State Management (Zustand)
+
+- Use the shared `api` instance from `src/api/client.js` for requests.
+- Track `isLoading` and `error` around async operations.
+- Prefer optimistic updates only when you also handle rollback on failure.
+- Return created/updated entities from actions when callers need them.
+- Keep selectors simple and derived from store state (`get()`).

@@ -1,0 +1,13 @@
+---
+description: React component conventions for the dashboard UI
+alwaysApply: false
+---
+
+# React UI Components
+
+- Use functional components with hooks; avoid class components.
+- Keep component responsibilities focused (container vs presentational).
+- Prefer existing helpers like `classNames()` from `src/utils/helpers.js` for dynamic classes.
+- Use shared constants from `src/utils/constants.js` for statuses, priorities, and columns.
+- Keep routing in `src/App.jsx`; add new pages under `src/pages/` and reusable UI in `src/components/`.
+- Prefer Tailwind utility classes and shared styles (`btn-primary`, `input-field`, `card`) over inline styles.

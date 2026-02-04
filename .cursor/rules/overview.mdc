@@ -1,0 +1,22 @@
+---
+description: How to apply Mosbot dashboard rules
+alwaysApply: true
+---
+
+# Cursor Rule Overview
+
+Use these rules to keep changes consistent with the Mosbot dashboard codebase.
+
+## How to choose rules
+
+- Pick the rule that matches the files you are editing.
+- If multiple rules apply, follow all relevant guidance.
+- Keep changes aligned with existing patterns in `src/`.
+
+## When to use each rule
+
+- `react-ui-components.mdc`: React components and page layout patterns in `src/**/*.jsx`.
+- `state-management.mdc`: Zustand store updates in `src/stores/**/*.js`.
+- `api-client.mdc`: Axios client usage in `src/api/**/*.js`.
+- `styling-tailwind.mdc`: Tailwind and shared CSS utilities in `src/**/*.css`.
+- `brand-style-guide.mdc`: Brand tone, typography, and UI styling in `src/**/*.{jsx,css}`.
