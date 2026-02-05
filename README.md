@@ -29,7 +29,7 @@ A self-hosted, dark-themed Kanban task management dashboard for autonomous AI ag
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 - MosBot API backend running
 
@@ -67,44 +67,96 @@ npm run build
 
 # Preview production build
 npm run preview
+
+# The build output will be in the dist/ folder
 ```
 
-## Docker Deployment
+## Deployment
 
-### Build and Run
+The dashboard is deployed as a static website on AWS S3 + CloudFront CDN.
+
+### Automated Deployment (GitHub Actions)
+
+Pushes to `develop` or `master` branches automatically trigger deployment via GitHub Actions.
+
+#### Required GitHub Secrets
+
+Configure these secrets in your repository (Settings → Secrets and variables → Actions):
+
+| Secret | Description | Example |
+|--------|-------------|---------|
+| `AWS_ACCESS_KEY_ID` | AWS access key for deployment | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `AWS_REGION` | AWS region for S3 bucket | `us-east-1` |
+| `S3_BUCKET_NAME` | S3 bucket name | `mosbot-dashboard` |
+| `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution ID | `E1234567890ABC` |
+| `VITE_API_URL` | Production API URL | `https://api.yourdomain.com/api/v1` |
+
+#### IAM Policy for Deployment
+
+The AWS user needs these permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR-BUCKET-NAME",
+        "arn:aws:s3:::YOUR-BUCKET-NAME/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateInvalidation"
+      ],
+      "Resource": "arn:aws:cloudfront::YOUR-ACCOUNT-ID:distribution/YOUR-DISTRIBUTION-ID"
+    }
+  ]
+}
+```
+
+#### Deployment Workflow
+
+The GitHub Actions workflow (`.github/workflows/build-deploy.yml`):
+
+1. ✅ Runs tests
+2. ✅ Builds the React app with production environment variables
+3. ✅ Syncs `dist/` to S3 with optimized caching:
+   - Static assets (JS, CSS, images): cached for 1 year
+   - `index.html`: no cache (always fresh)
+4. ✅ Invalidates CloudFront cache for immediate updates
+
+### Manual Deployment
+
+If you need to deploy manually:
 
 ```bash
-# Build Docker image
-docker build -t mosbot-dashboard:latest .
+# Build the app
+npm run build
 
-# Run container
-docker run -p 8080:80 \
-  -e VITE_API_URL=https://api.mosbot.example.com \
-  mosbot-dashboard:latest
-```
+# Sync to S3
+aws s3 sync dist/ s3://YOUR-BUCKET-NAME/ \
+  --delete \
+  --cache-control "public, max-age=31536000, immutable" \
+  --exclude "index.html"
 
-### Docker Compose
+# Upload index.html with no-cache
+aws s3 cp dist/index.html s3://YOUR-BUCKET-NAME/index.html \
+  --cache-control "public, max-age=0, must-revalidate"
 
-```yaml
-version: '3.8'
-services:
-  dashboard:
-    image: mosbot-dashboard:latest
-    ports:
-      - "8080:80"
-    environment:
-      - VITE_API_URL=http://api:3000/api/v1
-    depends_on:
-      - api
-```
-
-## Kubernetes Deployment
-
-See `k8s/` directory for Kubernetes manifests compatible with ArgoCD GitOps.
-
-```bash
-# Apply manifests
-kubectl apply -k k8s/base/
+# Invalidate CloudFront cache
+aws cloudfront create-invalidation \
+  --distribution-id YOUR-DISTRIBUTION-ID \
+  --paths "/*"
 ```
 
 ## Configuration
@@ -120,7 +172,7 @@ kubectl apply -k k8s/base/
 
 ## Project Structure
 
-```
+```bash
 mosbot-dashboard/
 ├── src/
 │   ├── api/           # API client
@@ -132,10 +184,26 @@ mosbot-dashboard/
 │   ├── main.jsx       # Entry point
 │   └── index.css      # Global styles
 ├── public/            # Static assets
-├── k8s/               # Kubernetes manifests
-├── Dockerfile         # Docker build config
-├── nginx.conf         # Nginx config for production
+├── .github/
+│   └── workflows/     # GitHub Actions workflows
+├── docs/              # Documentation
 └── vite.config.js     # Vite configuration
+```
+
+## Testing
+
+```bash
+# Run tests
+npm run test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests once (CI mode)
+npm run test:run
 ```
 
 ## Development Guidelines
@@ -144,8 +212,9 @@ mosbot-dashboard/
 
 1. Create feature branch: `git checkout -b feature/my-feature`
 2. Make changes and test locally
-3. Build and verify: `npm run build && npm run preview`
-4. Open PR to `develop` branch
+3. Run tests: `npm run test:run`
+4. Build and verify: `npm run build && npm run preview`
+5. Open PR to `develop` branch
 
 ### Code Style
 
@@ -153,6 +222,7 @@ mosbot-dashboard/
 - Follow Tailwind utility-first approach
 - Keep components small and focused
 - Add JSDoc comments for complex functions
+- Write tests for new features
 
 ## Contributing
 

@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mosbot
-  labels:
-    name: mosbot
-    project: homelab
