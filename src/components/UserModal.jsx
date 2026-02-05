@@ -209,15 +209,21 @@ export default function UserModal({ isOpen, onClose, user = null, onSave }) {
                       value={formData.role}
                       onChange={handleChange}
                       className="input-field"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || (user && user.role === 'owner')}
                     >
                       <option value="user">User</option>
                       <option value="admin">Admin</option>
+                      {user && user.role === 'owner' && <option value="owner">Owner</option>}
                     </select>
+                    {user && user.role === 'owner' && (
+                      <p className="text-xs text-dark-500 mt-1">
+                        Owner role cannot be changed
+                      </p>
+                    )}
                   </div>
 
-                  {/* Active Status (only in edit mode) */}
-                  {user && (
+                  {/* Active Status (only in edit mode, hidden for owner) */}
+                  {user && user.role !== 'owner' && (
                     <div>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input

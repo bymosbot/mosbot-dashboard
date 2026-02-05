@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import api from '../api/client';
+import logger from '../utils/logger';
 
 // Mood definitions with labels and styling
 export const MOODS = {
@@ -41,6 +43,7 @@ export const useBotStore = create((set, get) => ({
   lastErrorAt: null,
   lastSuccessAt: null,
   isConnected: true, // Bot connection status (will be controlled by openclaw integration)
+  healthCheckInterval: null, // Interval ID for health checks
   
   // Mood state (activity-driven only)
   currentMood: MOODS.CALM,
@@ -140,7 +143,48 @@ export const useBotStore = create((set, get) => ({
   // Call setConnected(true/false) when openclaw bot connects/disconnects
   setConnected: (connected) => set({ isConnected: connected }),
   
-  // Cleanup function to clear all mood timers
+  // Check OpenClaw workspace service health
+  checkOpenClawHealth: async () => {
+    try {
+      const response = await api.get('/openclaw/workspace/status');
+      const isHealthy = response.data?.data?.accessible === true;
+      set({ isConnected: isHealthy });
+      return isHealthy;
+    } catch (error) {
+      logger.warn('OpenClaw health check failed', { error: error.message });
+      set({ isConnected: false });
+      return false;
+    }
+  },
+  
+  // Start periodic health checks
+  startHealthChecks: () => {
+    const state = get();
+    
+    // Don't start if already running
+    if (state.healthCheckInterval) return;
+    
+    // Initial check
+    get().checkOpenClawHealth();
+    
+    // Check every 30 seconds
+    const interval = setInterval(() => {
+      get().checkOpenClawHealth();
+    }, 30000);
+    
+    set({ healthCheckInterval: interval });
+  },
+  
+  // Stop periodic health checks
+  stopHealthChecks: () => {
+    const state = get();
+    if (state.healthCheckInterval) {
+      clearInterval(state.healthCheckInterval);
+      set({ healthCheckInterval: null });
+    }
+  },
+  
+  // Cleanup function to clear all mood timers and health checks
   // Call this when components unmount or store needs to be reset
   cleanupTimers: () => {
     const state = get();
@@ -150,7 +194,10 @@ export const useBotStore = create((set, get) => ({
     if (state.moodTimers.excitement) {
       clearTimeout(state.moodTimers.excitement);
     }
-    set({ moodTimers: {} });
+    if (state.healthCheckInterval) {
+      clearInterval(state.healthCheckInterval);
+    }
+    set({ moodTimers: {}, healthCheckInterval: null });
   },
   
   // Computed properties

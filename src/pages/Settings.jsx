@@ -70,19 +70,15 @@ export default function Settings() {
   };
 
   const handleSaveUser = async (userData, userId) => {
-    try {
-      if (userId) {
-        // Update existing user
-        await api.put(`/admin/users/${userId}`, userData);
-      } else {
-        // Create new user
-        await api.post('/admin/users', userData);
-      }
-      await fetchUsers();
-      setIsModalOpen(false);
-    } catch (err) {
-      throw err; // Re-throw to be caught by UserModal
+    if (userId) {
+      // Update existing user
+      await api.put(`/admin/users/${userId}`, userData);
+    } else {
+      // Create new user
+      await api.post('/admin/users', userData);
     }
+    await fetchUsers();
+    setIsModalOpen(false);
   };
 
   const formatDate = (dateString) => {
@@ -98,7 +94,7 @@ export default function Settings() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <p className="text-xl text-dark-300 mb-2">Access Denied</p>
-          <p className="text-dark-500">You don't have permission to access this page.</p>
+          <p className="text-dark-500">You don&apos;t have permission to access this page.</p>
         </div>
       </div>
     );
@@ -108,7 +104,10 @@ export default function Settings() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 bg-dark-900 border-b border-dark-800">
-        <h1 className="text-2xl font-bold text-dark-100">Settings</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold text-dark-100">Settings</h1>
+          <p className="text-sm text-dark-500">Manage users and system configuration</p>
+        </div>
       </div>
 
       {/* Content */}
@@ -169,7 +168,9 @@ export default function Settings() {
                           <td className="py-3 px-4">
                             <span
                               className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                                user.role === 'admin'
+                                user.role === 'owner'
+                                  ? 'bg-amber-900/30 text-amber-300'
+                                  : user.role === 'admin'
                                   ? 'bg-purple-900/30 text-purple-300'
                                   : 'bg-dark-700 text-dark-300'
                               }`}
@@ -193,16 +194,17 @@ export default function Settings() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleEditUser(user)}
-                                className="p-2 text-dark-400 hover:text-primary-500 transition-colors"
+                                className="p-2 text-dark-400 hover:text-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Edit user"
+                                disabled={user.role === 'owner' && currentUser?.role !== 'owner'}
                               >
                                 <PencilIcon className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteUser(user.id)}
-                                className="p-2 text-dark-400 hover:text-red-500 transition-colors"
+                                className="p-2 text-dark-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Delete user"
-                                disabled={user.id === currentUser?.id}
+                                disabled={user.id === currentUser?.id || user.role === 'owner'}
                               >
                                 <TrashIcon className="w-4 h-4" />
                               </button>

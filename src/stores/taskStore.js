@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import logger from '../utils/logger';
 
 export const useTaskStore = create((set, get) => ({
   tasks: [],
   isLoading: false,
   error: null,
+  searchQuery: '',
   
   // Fetch all tasks
   fetchTasks: async () => {
@@ -15,7 +17,7 @@ export const useTaskStore = create((set, get) => ({
       set({ tasks: response.data.data || [], isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      console.error('Failed to fetch tasks:', error);
+      logger.error('Failed to fetch tasks', error);
     }
   },
   
@@ -42,7 +44,7 @@ export const useTaskStore = create((set, get) => ({
       return task;
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      console.error('Failed to fetch task:', error);
+      logger.error('Failed to fetch task', error);
       throw error;
     }
   },
@@ -61,7 +63,7 @@ export const useTaskStore = create((set, get) => ({
       return newTask;
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      console.error('Failed to create task:', error);
+      logger.error('Failed to create task', error);
       throw error;
     }
   },
@@ -82,7 +84,7 @@ export const useTaskStore = create((set, get) => ({
       return updatedTask;
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      console.error('Failed to update task:', error);
+      logger.error('Failed to update task', error);
       throw error;
     }
   },
@@ -98,7 +100,7 @@ export const useTaskStore = create((set, get) => ({
       }));
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      console.error('Failed to delete task:', error);
+      logger.error('Failed to delete task', error);
       throw error;
     }
   },
@@ -125,13 +127,32 @@ export const useTaskStore = create((set, get) => ({
         ),
         error: error.message,
       }));
-      console.error('Failed to move task:', error);
+      logger.error('Failed to move task', error);
     }
   },
   
   // Get tasks by status
   getTasksByStatus: (status) => {
     return get().tasks.filter((task) => task.status === status);
+  },
+  
+  // Set search query
+  setSearchQuery: (query) => {
+    set({ searchQuery: query });
+  },
+  
+  // Filter tasks by search query
+  getFilteredTasks: () => {
+    const { tasks, searchQuery } = get();
+    if (!searchQuery.trim()) {
+      return tasks;
+    }
+    const query = searchQuery.toLowerCase();
+    return tasks.filter((task) => {
+      const title = (task.title || '').toLowerCase();
+      const description = (task.description || '').toLowerCase();
+      return title.includes(query) || description.includes(query);
+    });
   },
   
   // Fetch task history
@@ -141,7 +162,7 @@ export const useTaskStore = create((set, get) => ({
       // API returns { data: [...], pagination: {...} }
       return response.data.data || [];
     } catch (error) {
-      console.error('Failed to fetch task history:', error);
+      logger.error('Failed to fetch task history', error);
       throw error;
     }
   },

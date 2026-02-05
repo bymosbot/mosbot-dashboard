@@ -5,8 +5,123 @@ alwaysApply: false
 
 # State Management (Zustand)
 
+## Basic Store Pattern
+
 - Use the shared `api` instance from `src/api/client.js` for requests.
 - Track `isLoading` and `error` around async operations.
 - Prefer optimistic updates only when you also handle rollback on failure.
 - Return created/updated entities from actions when callers need them.
 - Keep selectors simple and derived from store state (`get()`).
+
+## Toast Store
+
+Use `toastStore` for user notifications:
+
+```javascript
+import { useToastStore } from '../stores/toastStore';
+
+// In component
+const { showToast } = useToastStore();
+
+// Usage
+showToast(message, type, duration);
+// type: 'success' | 'error' | 'info'
+// duration: milliseconds (default: 3000)
+```
+
+**Store structure**:
+
+```javascript
+{
+  toasts: [
+    { id, message, type, show }
+  ],
+  showToast: (message, type, duration) => {},
+  hideToast: (id) => {}
+}
+```
+
+## Async Operations
+
+Always handle loading and error states:
+
+```javascript
+fetchData: async () => {
+  set({ isLoading: true, error: null });
+  try {
+    const response = await api.get('/endpoint');
+    set({ data: response.data.data, isLoading: false });
+    return response.data.data;
+  } catch (error) {
+    set({ error: error.message, isLoading: false });
+    throw error; // Let caller handle
+  }
+}
+```
+
+## Lazy Loading in Stores
+
+For data that's not always needed:
+
+```javascript
+// Don't fetch automatically
+const [dataLoaded, setDataLoaded] = useState(false);
+
+fetchData: async (forceRefresh = false) => {
+  // Skip if already loaded
+  const state = get();
+  if (state.dataLoaded && !forceRefresh) {
+    return state.data;
+  }
+  
+  set({ isLoading: true });
+  try {
+    const data = await api.get('/endpoint');
+    set({ 
+      data, 
+      dataLoaded: true,
+      isLoading: false 
+    });
+    return data;
+  } catch (error) {
+    set({ error: error.message, isLoading: false });
+    throw error;
+  }
+}
+```
+
+## Cache Invalidation
+
+Reset loaded flags after mutations:
+
+```javascript
+updateTask: async (taskId, updates) => {
+  const updated = await api.patch(`/tasks/${taskId}`, updates);
+  
+  set((state) => ({
+    tasks: state.tasks.map(t => t.id === taskId ? updated : t),
+    // Invalidate related caches
+    historyLoaded: false,
+    activityLoaded: false
+  }));
+  
+  return updated;
+}
+```
+
+## Error Handling
+
+Provide meaningful error messages:
+
+```javascript
+try {
+  await api.post('/tasks', data);
+} catch (error) {
+  const message = error.response?.data?.error?.message 
+    || error.message 
+    || 'Operation failed';
+  
+  set({ error: message });
+  throw new Error(message);
+}
+```

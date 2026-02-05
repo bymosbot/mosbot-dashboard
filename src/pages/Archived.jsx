@@ -5,7 +5,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/taskStore';
 import TaskCard from '../components/TaskCard';
-import Header from '../components/Header';
+import logger from '../utils/logger';
 
 const TaskModal = lazy(() => import('../components/TaskModal'));
 
@@ -26,9 +26,9 @@ export default function Archived() {
     try {
       const response = await api.get('/tasks', { params: { status: 'ARCHIVE' } });
       setArchivedTasks(response.data.data || []);
-      console.log('Fetched archived tasks:', response.data.data?.length || 0);
+      logger.info('Fetched archived tasks', { count: response.data.data?.length || 0 });
     } catch (error) {
-      console.error('Failed to fetch archived tasks:', error);
+      logger.error('Failed to fetch archived tasks', error);
     } finally {
       setIsRefreshing(false);
     }
@@ -72,7 +72,10 @@ export default function Archived() {
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between px-6 py-4 bg-dark-900 border-b border-dark-800">
-          <h1 className="text-2xl font-bold text-dark-100">Archived Tasks</h1>
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-bold text-dark-100">Archived Tasks</h1>
+            <p className="text-sm text-dark-500">View and restore completed tasks that have been archived</p>
+          </div>
           <button
             onClick={fetchArchivedTasks}
             disabled={isRefreshing}

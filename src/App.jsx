@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
+import ToastContainer from './components/ToastContainer';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Docs from './pages/Docs';
@@ -42,6 +43,7 @@ function App() {
             <Route path="/task/:id" element={<Layout><TaskView /></Layout>} />
           </Route>
         </Routes>
+        <ToastContainer />
       </Router>
     </ErrorBoundary>
   );

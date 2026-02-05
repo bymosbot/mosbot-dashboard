@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import Login from './Login';
@@ -46,19 +46,22 @@ describe('Login', () => {
   });
 
   it('shows error when submitting empty form', async () => {
-    const user = userEvent.setup();
     render(
       <BrowserRouter>
         <Login />
       </BrowserRouter>
     );
 
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
-    await user.click(submitButton);
+    const form = screen.getByRole('button', { name: /sign in/i }).closest('form');
+    
+    // Use fireEvent.submit to bypass HTML5 validation in tests
+    await act(async () => {
+      fireEvent.submit(form);
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Please enter both email and password')).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   });
 
   it('calls login with email and password on submit', async () => {
@@ -75,9 +78,11 @@ describe('Login', () => {
     const passwordInput = screen.getByLabelText(/password/i);
     const submitButton = screen.getByRole('button', { name: /sign in/i });
 
-    await user.type(emailInput, 'test@example.com');
-    await user.type(passwordInput, 'password123');
-    await user.click(submitButton);
+    await act(async () => {
+      await user.type(emailInput, 'test@example.com');
+      await user.type(passwordInput, 'password123');
+      await user.click(submitButton);
+    });
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123');
@@ -98,9 +103,11 @@ describe('Login', () => {
     const passwordInput = screen.getByLabelText(/password/i);
     const submitButton = screen.getByRole('button', { name: /sign in/i });
 
-    await user.type(emailInput, 'test@example.com');
-    await user.type(passwordInput, 'wrongpassword');
-    await user.click(submitButton);
+    await act(async () => {
+      await user.type(emailInput, 'test@example.com');
+      await user.type(passwordInput, 'wrongpassword');
+      await user.click(submitButton);
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Invalid credentials')).toBeInTheDocument();

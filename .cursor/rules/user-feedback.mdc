@@ -1,0 +1,634 @@
+---
+description: User feedback patterns (toasts, loading states, error handling)
+alwaysApply: false
+---
+
+# User Feedback Patterns
+
+## Toast Notifications
+
+Use `toastStore` for non-blocking user feedback.
+
+### Basic Usage
+
+```jsx
+import { useToastStore } from '../stores/toastStore';
+
+const { showToast } = useToastStore();
+
+// Success (green)
+showToast('Task updated successfully', 'success');
+
+// Error (red)
+showToast('Failed to save task', 'error');
+
+// Info (blue)
+showToast('Processing your request', 'info');
+
+// Custom duration (default: 3000ms)
+showToast('Message', 'success', 5000);
+```
+
+### When to Use Toasts
+
+✅ **Use for**:
+
+- Successful mutations (create, update, delete)
+- Failed operations with error message
+- Background process completion
+- Important notifications that don't require action
+- Confirmations after async operations
+
+❌ **Don't use for**:
+
+- Form validation errors (show inline)
+- Confirmations before actions (use dialogs)
+- Critical errors (use error boundaries)
+- Information that requires user action
+- Long messages (use modals)
+
+### Toast Types
+
+**Success** (green):
+
+```jsx
+showToast('Task created successfully', 'success');
+showToast('Changes saved', 'success');
+showToast('Task deleted', 'success');
+```
+
+**Error** (red):
+
+```jsx
+showToast('Failed to save task', 'error');
+showToast('Network error occurred', 'error');
+showToast(error.response?.data?.error?.message || 'Operation failed', 'error');
+```
+
+**Info** (blue):
+
+```jsx
+showToast('Processing your request', 'info');
+showToast('Task moved to archive', 'info');
+```
+
+### Toast Messages
+
+**Good messages**:
+
+- ✅ "Task updated successfully"
+- ✅ "Changes saved"
+- ✅ "Failed to save task"
+- ✅ "Network error occurred"
+
+**Bad messages**:
+
+- ❌ "Success" (too vague)
+- ❌ "Error" (not helpful)
+- ❌ "Done" (unclear what's done)
+- ❌ "Failed" (what failed?)
+
+### Pattern: CRUD Operations
+
+```jsx
+// Create
+const handleCreate = async () => {
+  try {
+    await createTask(data);
+    showToast('Task created successfully', 'success');
+    onClose();
+  } catch (error) {
+    showToast(
+      error.response?.data?.error?.message || 'Failed to create task',
+      'error'
+    );
+  }
+};
+
+// Update
+const handleUpdate = async () => {
+  try {
+    await updateTask(taskId, data);
+    showToast('Task updated successfully', 'success');
+  } catch (error) {
+    showToast(
+      error.response?.data?.error?.message || 'Failed to update task',
+      'error'
+    );
+  }
+};
+
+// Delete
+const handleDelete = async () => {
+  if (!confirm('Are you sure?')) return;
+  
+  try {
+    await deleteTask(taskId);
+    showToast('Task deleted successfully', 'success');
+    onClose();
+  } catch (error) {
+    showToast(
+      error.response?.data?.error?.message || 'Failed to delete task',
+      'error'
+    );
+  }
+};
+```
+
+## Loading States
+
+Always show progress during async operations. When updating resources, the application may perform multiple sequential API calls (e.g., update task, reload history, reload activity) which can take 2-5 seconds. Without visual feedback, users experience uncertainty, may click buttons multiple times, and feel frustrated during wait periods.
+
+### Problem Statement
+
+During async operations (especially multi-step operations), users need:
+
+- Clear feedback that their action was registered
+- Visual indication that work is in progress
+- Prevention of duplicate submissions
+- Confidence that the app is working
+
+### Solution: Multi-Layer Loading Indicators
+
+Use multiple visual indicators working together:
+
+1. State management to track submission lifecycle
+2. Double-submission prevention
+3. Button loading states
+4. Form overlay for blocking interactions
+5. Disabled action buttons
+
+### State Management
+
+Track the entire submission lifecycle:
+
+```javascript
+const [isSubmitting, setIsSubmitting] = useState(false);
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Prevent double submission
+  if (isSubmitting) return;
+  
+  setIsSubmitting(true);
+  
+  try {
+    // Perform API calls
+    await updateTask(taskId, data);
+    await reloadHistory(taskId);
+    await reloadActivity(taskId);
+  } catch (error) {
+    // Handle error
+  } finally {
+    // Always reset, even on error
+    setIsSubmitting(false);
+  }
+};
+```
+
+The `isSubmitting` state:
+
+- Set to `true` at the start of submission
+- Remains `true` through all API calls
+- Set to `false` in the `finally` block (always executes)
+
+### Double-Submission Prevention
+
+Always check state before starting async operations:
+
+```javascript
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Early return prevents multiple simultaneous submissions
+  if (isSubmitting) return;
+  
+  setIsSubmitting(true);
+  // ... rest of the logic
+};
+```
+
+### Button Loading States
+
+The submit button shows three states:
+
+**Normal State**: `[Update Task]`
+**Loading State**: `[⟳ Updating...]`
+
+```jsx
+<button
+  type="submit"
+  disabled={isSubmitting}
+  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+>
+  {isSubmitting && (
+    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  )}
+  {isSubmitting 
+    ? (task ? 'Updating...' : 'Creating...') 
+    : (task ? 'Update Task' : 'Create Task')
+  }
+</button>
+```
+
+**Features**:
+
+- Spinner icon appears immediately when clicked
+- Button text changes to indicate action
+- Button becomes disabled (opacity 50%, no pointer cursor)
+- Prevents multiple clicks
+
+### Form Overlay
+
+A full-screen overlay prevents interaction during submission. Use for forms with multiple fields or multi-step operations:
+
+```jsx
+<form onSubmit={handleSubmit} className="relative">
+  {/* Loading Overlay */}
+  {isSubmitting && (
+    <div className="absolute inset-0 bg-dark-900/50 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="inline-block w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-dark-200 font-medium">
+          {task ? 'Updating task...' : 'Creating task...'}
+        </p>
+      </div>
+    </div>
+  )}
+  
+  {/* Form fields */}
+</form>
+```
+
+**Features**:
+
+- Semi-transparent dark background (`bg-dark-900/50`)
+- Backdrop blur effect for depth
+- Large spinner (12x12 with 4px border)
+- Clear status message
+- Positioned absolutely over the form
+- High z-index (z-10) to overlay all form elements
+- Blocks all form interactions during submission
+
+### Inline Spinners
+
+For loading data in place (not blocking the entire form):
+
+```jsx
+{loadingHistory ? (
+  <div className="flex items-center justify-center py-12">
+    <div className="inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+) : history.length === 0 ? (
+  <div className="text-center py-12">
+    <p className="text-dark-400">No history available</p>
+  </div>
+) : (
+  <HistoryList data={history} />
+)}
+```
+
+Use smaller spinners (8x8) for inline loading that doesn't block the entire interface.
+
+### Visual States
+
+**Before Clicking Update**:
+
+```bash
+┌─────────────────────────────────────┐
+│ Edit Task                      [×]  │
+├─────────────────────────────────────┤
+│ Title: [My Task Title________]      │
+│ Details:                            │
+│ Status: [In Progress ▼]             │
+├─────────────────────────────────────┤
+│ [Delete Task]    [Cancel] [Update]  │
+└─────────────────────────────────────┘
+```
+
+**During Update (0-5 seconds)**:
+
+```bash
+┌─────────────────────────────────────┐
+│ Edit Task                      [×]  │
+├─────────────────────────────────────┤
+│ ╔═══════════════════════════════╗   │
+│ ║         ⟳ (spinning)          ║   │
+│ ║     Updating task...          ║   │
+│ ╚═══════════════════════════════╝   │
+│ [Blurred form content below]        │
+├─────────────────────────────────────┤
+│ [Delete] (disabled)  [Cancel] [⟳ Updating...] │
+│                      (disabled) (disabled)     │
+└─────────────────────────────────────┘
+```
+
+**After Update**:
+
+```bash
+┌─────────────────────────────────────┐
+│ My Task Title                  [×]  │
+├─────────────────────────────────────┤
+│ [View mode with updated content]    │
+└─────────────────────────────────────┘
+
+┌──────────────────────────────┐
+│ ✓ Task updated successfully  │  ← Toast notification
+└──────────────────────────────┘
+```
+
+### User Experience Flow
+
+1. **User clicks "Update Task"**
+   - Button immediately shows spinner and "Updating..." text
+   - Button becomes disabled (opacity 50%, no pointer)
+   - Cancel and Delete buttons become disabled
+   - Form overlay appears with large spinner
+
+2. **API calls execute (2-5 seconds)**
+   - User sees clear indication that work is in progress
+   - Cannot interact with form or buttons
+   - Cannot accidentally trigger duplicate submissions
+   - Status message confirms what's happening
+
+3. **Update completes successfully**
+   - Loading overlay fades out
+   - Modal switches to view mode (if applicable)
+   - Toast notification appears: "Task updated successfully"
+   - All data is refreshed (task, history, activity)
+
+4. **Update fails (error case)**
+   - Loading overlay fades out
+   - Modal stays in edit mode
+   - Toast notification appears with error message
+   - User can try again or cancel
+
+### Benefits
+
+**For Users**:
+
+- ✅ Clear feedback that action was registered
+- ✅ No confusion during wait periods
+- ✅ Cannot accidentally submit twice
+- ✅ Knows exactly what's happening
+- ✅ Confidence that app is working
+
+**For Developers**:
+
+- ✅ Prevents race conditions
+- ✅ Prevents duplicate API calls
+- ✅ Consistent loading pattern
+- ✅ Easy to extend to other forms
+- ✅ Proper error handling
+
+### Testing Checklist
+
+When implementing loading states, verify:
+
+- [ ] Click submit - spinner appears immediately
+- [ ] During submission - cannot click any buttons
+- [ ] During submission - cannot close modal (if applicable)
+- [ ] During submission - overlay shows clear message
+- [ ] After success - loading state clears
+- [ ] After success - toast notification appears
+- [ ] After success - all data is refreshed
+- [ ] On error - loading state clears
+- [ ] On error - error toast appears
+- [ ] On error - can try again
+
+### Future Enhancements
+
+Consider these improvements for better UX:
+
+1. **Progress Indicators**: Show which API call is currently executing
+   - "Updating task..." (step 1/3)
+   - "Reloading history..." (step 2/3)
+   - "Reloading activity..." (step 3/3)
+
+2. **Optimistic Updates**: Update UI immediately, revert on error
+   - Faster perceived performance
+   - Better UX for fast connections
+
+3. **Retry Logic**: Automatic retry on network failures
+   - Exponential backoff
+   - User notification of retry attempts
+
+4. **Timeout Handling**: Show warning if update takes too long
+   - "This is taking longer than usual..."
+   - Option to cancel and retry
+
+5. **Offline Detection**: Prevent submission when offline
+   - Check `navigator.onLine`
+   - Show helpful message
+
+### Disable During Loading
+
+Disable all interactive elements during submission to prevent:
+
+- Closing the modal mid-update
+- Deleting the resource while updating
+- Navigating away during the operation
+- Triggering other actions
+
+```jsx
+<button
+  type="button"
+  onClick={handleDelete}
+  disabled={isSubmitting}
+  className="px-4 py-2 text-red-500 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  Delete Task
+</button>
+
+<button
+  type="button"
+  onClick={onClose}
+  disabled={isSubmitting}
+  className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  Cancel
+</button>
+```
+
+All action buttons should be disabled with:
+
+- `disabled={isSubmitting}` attribute
+- `disabled:opacity-50` for visual feedback
+- `disabled:cursor-not-allowed` for cursor indication
+
+## Error Handling
+
+### Inline Form Errors
+
+```jsx
+const [errors, setErrors] = useState({});
+
+<div>
+  <label>Title *</label>
+  <input
+    value={title}
+    onChange={(e) => setTitle(e.target.value)}
+    className={errors.title ? 'input-field border-red-500' : 'input-field'}
+  />
+  {errors.title && (
+    <p className="text-red-500 text-sm mt-1">{errors.title}</p>
+  )}
+</div>
+```
+
+### API Error Messages
+
+Extract meaningful messages from API errors:
+
+```jsx
+try {
+  await api.post('/tasks', data);
+} catch (error) {
+  const message = error.response?.data?.error?.message 
+    || error.message 
+    || 'An unexpected error occurred';
+  
+  showToast(message, 'error');
+}
+```
+
+### Empty States
+
+Show helpful messages when no data:
+
+```jsx
+{data.length === 0 ? (
+  <div className="text-center py-12">
+    <p className="text-dark-400 mb-2">No tasks yet</p>
+    <button onClick={handleCreate} className="btn-primary">
+      Create your first task
+    </button>
+  </div>
+) : (
+  <TaskList data={data} />
+)}
+```
+
+## Confirmation Dialogs
+
+Use native confirm for destructive actions:
+
+```jsx
+const handleDelete = async () => {
+  if (!window.confirm('Are you sure you want to delete this task?')) {
+    return;
+  }
+  
+  try {
+    await deleteTask(taskId);
+    showToast('Task deleted successfully', 'success');
+    onClose();
+  } catch (error) {
+    showToast('Failed to delete task', 'error');
+  }
+};
+```
+
+## Progress Indicators
+
+### Determinate Progress
+
+When you know the total:
+
+```jsx
+<div className="w-full bg-dark-700 rounded-full h-2">
+  <div 
+    className="bg-primary-600 h-2 rounded-full transition-all"
+    style={{ width: `${(current / total) * 100}%` }}
+  />
+</div>
+<p className="text-sm text-dark-400 mt-1">
+  {current} of {total} items processed
+</p>
+```
+
+### Indeterminate Progress
+
+When duration is unknown:
+
+```jsx
+<div className="inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+```
+
+## Best Practices
+
+### 1. Always Show Feedback
+
+```jsx
+// ✅ Good
+try {
+  await saveData();
+  showToast('Saved', 'success');
+} catch (error) {
+  showToast('Failed', 'error');
+}
+
+// ❌ Bad
+await saveData(); // Silent
+```
+
+### 2. Be Specific
+
+```jsx
+// ✅ Good
+showToast('Task updated successfully', 'success');
+
+// ❌ Bad
+showToast('Success', 'success');
+```
+
+### 3. Handle All States
+
+```jsx
+// ✅ Good
+{loading ? (
+  <Spinner />
+) : error ? (
+  <Error message={error} />
+) : data.length === 0 ? (
+  <EmptyState />
+) : (
+  <Content data={data} />
+)}
+
+// ❌ Bad
+<Content data={data} /> // No loading/error/empty
+```
+
+### 4. Disable During Actions
+
+```jsx
+// ✅ Good
+<button disabled={isSubmitting}>
+  {isSubmitting ? 'Saving...' : 'Save'}
+</button>
+
+// ❌ Bad
+<button onClick={save}>Save</button> // Can click multiple times
+```
+
+### 5. Clear Error Messages
+
+```jsx
+// ✅ Good
+showToast('Failed to save task: Network error', 'error');
+
+// ❌ Bad
+showToast('Error', 'error');
+```
+
+## Related Components
+
+- `src/components/Toast.jsx` - Toast component
+- `src/components/ToastContainer.jsx` - Toast manager
+- `src/stores/toastStore.js` - Toast state
+- `src/components/TaskModal.jsx` - Reference implementation for loading states

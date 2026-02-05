@@ -50,7 +50,7 @@ const formatForConsole = (entry) => {
 /**
  * Send log entry to external service (placeholder for future integration)
  */
-const sendToExternalService = async (entry) => {
+const sendToExternalService = async (_entry) => {
   // Placeholder for external logging service integration
   // Example: Sentry, LogRocket, DataDog, etc.
   // if (window.Sentry) {
@@ -65,6 +65,7 @@ const logger = {
   debug: (message, context = {}) => {
     if (currentLogLevel <= LOG_LEVELS.DEBUG) {
       const entry = createLogEntry('DEBUG', message, context);
+      // eslint-disable-next-line no-console
       console.debug(formatForConsole(entry));
       sendToExternalService(entry);
     }
@@ -73,6 +74,7 @@ const logger = {
   info: (message, context = {}) => {
     if (currentLogLevel <= LOG_LEVELS.INFO) {
       const entry = createLogEntry('INFO', message, context);
+      // eslint-disable-next-line no-console
       console.info(formatForConsole(entry));
       sendToExternalService(entry);
     }

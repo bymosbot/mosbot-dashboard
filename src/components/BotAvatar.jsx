@@ -2,20 +2,47 @@ import { useState, useEffect, useRef } from 'react';
 import { useBotStore } from '../stores/botStore';
 import { classNames } from '../utils/helpers';
 
+// Motivational quotes for teletext display (when idle and online)
+const MOTIVATIONAL_QUOTES = [
+  'Ready to make today amazing ✨',
+  'Every task is a step forward 🚀',
+  'You\'ve got this! Let\'s do it 💪',
+  'Small progress is still progress 📈',
+  'Today is full of possibilities 🌟',
+  'Focus on what matters most 🎯',
+  'One task at a time, you\'ve got this 🎨',
+  'Your future self will thank you 🙏',
+  'Progress over perfection ⚡',
+  'Let\'s turn ideas into reality 🛠️',
+  'Every moment is a fresh start 🌱',
+  'You\'re capable of amazing things 🌈',
+  'Stay focused, stay positive ✨',
+  'The best time to start is now ⏰',
+  'Your effort today shapes tomorrow 🎯',
+];
+
 export default function BotAvatar({ enableEyeTracking = false }) {
   const [eyePosition, setEyePosition] = useState({ x: 50, y: 50 });
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(
+    Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)
+  );
   const avatarRef = useRef(null);
   
   const { 
-    currentMood, 
     inflightRequests,
     isConnected,
-    getActivityLabel,
     getActivityStatus,
-    isWorking 
+    startHealthChecks,
+    stopHealthChecks
   } = useBotStore();
   
   const activityStatus = getActivityStatus();
+
+  // Start OpenClaw health checks on mount
+  useEffect(() => {
+    startHealthChecks();
+    return () => stopHealthChecks();
+  }, [startHealthChecks, stopHealthChecks]);
 
   // Eye tracking effect (only if enabled)
   useEffect(() => {
@@ -46,6 +73,39 @@ export default function BotAvatar({ enableEyeTracking = false }) {
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [enableEyeTracking]);
+
+  // Rotate quotes every 5 minutes when online and idle
+  useEffect(() => {
+    // Only rotate when online and idle
+    if (activityStatus !== 'Idle' || !isConnected) return;
+
+    const interval = setInterval(() => {
+      setCurrentQuoteIndex((prev) => {
+        // Pick a random different quote
+        let nextIndex;
+        do {
+          nextIndex = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
+        } while (nextIndex === prev && MOTIVATIONAL_QUOTES.length > 1);
+        return nextIndex;
+      });
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [activityStatus, isConnected]);
+
+  // Get current message based on status
+  const getStatusMessage = () => {
+    if (activityStatus === 'Offline') {
+      return 'OFFLINE - RECONNECTING...';
+    }
+    if (activityStatus === 'Working') {
+      return inflightRequests > 0 
+        ? `WORKING ON ${inflightRequests} TASK${inflightRequests > 1 ? 'S' : ''}...`
+        : 'WORKING...';
+    }
+    // Idle - show rotating motivational quote
+    return MOTIVATIONAL_QUOTES[currentQuoteIndex].toUpperCase();
+  };
 
   return (
     <div className="border-b border-dark-800 px-6 py-8">
@@ -163,6 +223,34 @@ export default function BotAvatar({ enableEyeTracking = false }) {
             transform: scale(1);
             box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
           }
+        }
+        
+        /* Teletext style animations */
+        @keyframes teletext-fade {
+          0% { opacity: 0.8; }
+          50% { opacity: 1; }
+          100% { opacity: 0.8; }
+        }
+        @keyframes teletext-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-2px); }
+        }
+        @keyframes teletext-glitch {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-1px); }
+          75% { transform: translateX(1px); }
+        }
+        
+        .teletext-display {
+          font-family: 'Courier New', 'Courier', monospace;
+          letter-spacing: 0.05em;
+          color: #e2e8f0;
+          text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+          animation: teletext-fade 3s ease-in-out infinite;
+        }
+        
+        .teletext-message {
+          transition: opacity 0.5s ease-in-out;
         }
         
         /* State classes */
@@ -414,19 +502,26 @@ export default function BotAvatar({ enableEyeTracking = false }) {
         </div>
       </div>
 
-      {/* Large Status Button */}
-      <button
+      {/* Teletext Style Status Bar */}
+      <div
         className={classNames(
-          'w-full px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200',
-          activityStatus === 'Offline' 
-            ? 'bg-red-600/20 text-red-200 hover:bg-red-600/30 border-2 border-red-600/40'
-            : activityStatus === 'Working'
-            ? 'bg-yellow-600/20 text-yellow-200 hover:bg-yellow-600/30 border-2 border-yellow-600/40'
-            : 'bg-dark-800 text-dark-300 hover:bg-dark-700 border-2 border-dark-700'
+          'w-full px-4 py-3 rounded-lg text-xs font-bold transition-all duration-500',
+          'teletext-display',
+          'bg-dark-800/80 border-2 border-dark-700/50 backdrop-blur-sm'
         )}
+        style={{
+          fontFamily: "'Courier New', 'Courier', monospace",
+          lineHeight: '1.4',
+        }}
       >
-        {getActivityLabel()}
-      </button>
+        <div className="flex items-center justify-between">
+          <span className="select-none opacity-60">■</span>
+          <span className="flex-1 text-center px-2 teletext-message">
+            {getStatusMessage()}
+          </span>
+          <span className="select-none opacity-60">■</span>
+        </div>
+      </div>
     </div>
   );
 }

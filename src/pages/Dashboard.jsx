@@ -6,7 +6,7 @@ import Header from '../components/Header';
 const TaskModal = lazy(() => import('../components/TaskModal'));
 
 export default function Dashboard() {
-  const { fetchTasks, isLoading, error } = useTaskStore();
+  const { fetchTasks, isLoading, error, searchQuery, setSearchQuery } = useTaskStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
@@ -53,7 +53,13 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Dashboard" onCreateTask={handleCreateTask} />
+      <Header 
+        title="Dashboard" 
+        subtitle="Kanban board for task management and workflow tracking"
+        onCreateTask={handleCreateTask}
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
       
       <div className="flex-1 p-6 overflow-hidden">
         <KanbanBoard onTaskClick={handleTaskClick} />

@@ -5,7 +5,8 @@ import Column from './Column';
 import { KANBAN_COLUMNS } from '../utils/constants';
 
 export default function KanbanBoard({ onTaskClick }) {
-  const { tasks, moveTask } = useTaskStore();
+  const { moveTask, getFilteredTasks } = useTaskStore();
+  const tasks = getFilteredTasks();
 
   const handleTaskDrop = async (taskId, newStatus) => {
     await moveTask(taskId, newStatus);

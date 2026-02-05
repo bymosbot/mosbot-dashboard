@@ -110,9 +110,9 @@ export const useAuthStore = create((set, get) => ({
     }));
   },
   
-  // Check if current user is admin
+  // Check if current user is admin or owner
   isAdmin: () => {
     const { user } = get();
-    return user?.role === 'admin';
+    return user?.role === 'admin' || user?.role === 'owner';
   }
 }));

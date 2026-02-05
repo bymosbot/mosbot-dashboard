@@ -74,7 +74,7 @@ export default function Login() {
                 value={formData.email}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="admin@mosbot.local"
+                placeholder="owner@mosbot.local"
                 required
                 autoComplete="email"
                 disabled={isLoading}
@@ -121,7 +121,7 @@ export default function Login() {
           {import.meta.env.DEV && (
             <div className="mt-6 p-3 bg-dark-800 border border-dark-700 rounded-lg">
               <p className="text-xs text-dark-400 text-center">
-                Default credentials: admin@mosbot.local / admin123
+                Default credentials: owner@mosbot.local / admin123
               </p>
             </div>
           )}

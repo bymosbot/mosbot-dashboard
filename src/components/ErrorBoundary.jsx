@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import logger from '../utils/logger';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -6,14 +7,16 @@ class ErrorBoundary extends Component {
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error) {
     // Update state so the next render will show the fallback UI
     return { hasError: true };
   }
 
   componentDidCatch(error, errorInfo) {
     // Log error details for debugging
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('ErrorBoundary caught an error', error, {
+      componentStack: errorInfo.componentStack,
+    });
     this.setState({
       error,
       errorInfo,

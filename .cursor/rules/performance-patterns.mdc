@@ -1,0 +1,570 @@
+---
+description: Performance optimization patterns for the dashboard
+alwaysApply: false
+---
+
+# Performance Patterns
+
+## Overview
+
+Performance optimizations focus on reducing unnecessary API calls and improving user experience through lazy loading, smart caching, and efficient data management.
+
+## Problem Statement
+
+The original approach fetched all data immediately when opening a task:
+
+```javascript
+// ❌ Old approach - fetch everything immediately
+useEffect(() => {
+  if (isOpen && task) {
+    fetchUsers();
+    fetchExistingTags();
+    loadHistory(task.id);      // Always fetched
+    loadActivity(task.id);     // Always fetched
+  }
+}, [task, isOpen]);
+```
+
+**Issues**:
+
+- Users who only view task details still pay for History/Activity API calls
+- Slower modal open time (waiting for 4 API calls)
+- Wasted bandwidth and server resources
+- Poor user experience on slow connections
+
+## Lazy Loading
+
+Load data only when needed, not upfront.
+
+### Tab-Based Lazy Loading
+
+For modals or pages with tabs:
+
+```jsx
+const [activeTab, setActiveTab] = useState(0);
+const [historyLoaded, setHistoryLoaded] = useState(false);
+const [activityLoaded, setActivityLoaded] = useState(false);
+
+// Don't load on mount
+useEffect(() => {
+  if (isOpen) {
+    setActiveTab(0);
+    setHistoryLoaded(false);
+    setActivityLoaded(false);
+  }
+}, [isOpen]);
+
+// Load on tab click
+const handleTabChange = (index) => {
+  setActiveTab(index);
+  
+  if (index === 1 && !historyLoaded) {
+    loadHistory();
+  } else if (index === 2 && !activityLoaded) {
+    loadActivity();
+  }
+};
+
+// Load function with caching
+const loadHistory = async () => {
+  if (historyLoaded) return; // Skip if loaded
+  
+  setLoadingHistory(true);
+  try {
+    const data = await fetchHistory();
+    setHistory(data);
+    setHistoryLoaded(true);
+  } finally {
+    setLoadingHistory(false);
+  }
+};
+```
+
+### Benefits
+
+1. **Faster Initial Load**
+   - Only 2 API calls instead of 4
+   - Modal opens ~500-1000ms faster
+   - Better perceived performance
+
+2. **Reduced Server Load**
+   - 50% fewer API calls for users who don't view tabs
+   - Less database queries
+   - Lower bandwidth usage
+
+3. **Smart Caching**
+   - Data cached after first load
+   - No redundant requests on tab switches
+   - Cache invalidated after updates
+
+4. **Better UX**
+   - Instant modal open
+   - Data loads quickly when needed
+   - Loading indicators show progress
+
+## Cache Invalidation
+
+Reset loaded flags after mutations to ensure fresh data:
+
+```jsx
+const handleUpdate = async () => {
+  await updateTask(taskId, data);
+  
+  // Invalidate caches
+  setHistoryLoaded(false);
+  setActivityLoaded(false);
+  
+  // Only reload if user is viewing that tab
+  if (activeTab === 1) {
+    await loadHistory();
+  } else if (activeTab === 2) {
+    await loadActivity();
+  }
+};
+```
+
+### Modal Reset
+
+Reset state when opening a new task:
+
+```jsx
+useEffect(() => {
+  if (isOpen) {
+    // Reset tab to Comments
+    setActiveTab(0);
+    
+    // Reset loaded flags for new task
+    setHistoryLoaded(false);
+    setActivityLoaded(false);
+    
+    // Don't fetch History/Activity - wait for tab click
+  }
+}, [task, isOpen]);
+```
+
+## Loading States
+
+Always show progress during async operations.
+
+### Button Loading
+
+```jsx
+<button
+  type="submit"
+  disabled={isSubmitting}
+  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+>
+  {isSubmitting && (
+    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  )}
+  {isSubmitting ? 'Updating...' : 'Update Task'}
+</button>
+```
+
+### Form Overlay
+
+```jsx
+<form onSubmit={handleSubmit} className="relative">
+  {/* Loading Overlay */}
+  {isSubmitting && (
+    <div className="absolute inset-0 bg-dark-900/50 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="inline-block w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-dark-200 font-medium">Updating task...</p>
+      </div>
+    </div>
+  )}
+  
+  {/* Form content */}
+</form>
+```
+
+### Disable All Actions
+
+```jsx
+<button
+  disabled={isSubmitting}
+  className="disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  Cancel
+</button>
+
+<button
+  disabled={isSubmitting}
+  className="disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  Delete
+</button>
+```
+
+## Double-Submission Prevention
+
+Always prevent duplicate submissions:
+
+```jsx
+const [isSubmitting, setIsSubmitting] = useState(false);
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Early return if already submitting
+  if (isSubmitting) return;
+  
+  setIsSubmitting(true);
+  
+  try {
+    await saveData();
+    showToast('Saved successfully', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    setIsSubmitting(false); // Always reset
+  }
+};
+```
+
+## API Call Reduction
+
+### Before Optimization
+
+```jsx
+// ❌ Bad - loads everything upfront
+useEffect(() => {
+  if (isOpen && task) {
+    fetchUsers();
+    fetchTags();
+    fetchHistory();    // Not always needed
+    fetchActivity();   // Not always needed
+  }
+}, [isOpen, task]);
+
+// Result: 4 API calls every time
+```
+
+### After Optimization
+
+```jsx
+// ✅ Good - loads on demand
+useEffect(() => {
+  if (isOpen && task) {
+    fetchUsers();      // Needed for dropdown
+    fetchTags();       // Needed for autocomplete
+    // History/Activity loaded on tab click
+  }
+}, [isOpen, task]);
+
+// Result: 2 API calls initially, 50% reduction
+```
+
+## Metrics to Track
+
+Monitor these to measure performance:
+
+1. **API Call Count**
+   - Calls per modal open
+   - Calls per update
+   - Cache hit rate
+
+2. **Load Times**
+   - Time to modal open
+   - Time to first interaction
+   - Time to data load
+
+3. **User Behavior**
+   - % who view each tab
+   - Average tabs per session
+   - Most common workflows
+
+4. **Error Rates**
+   - Failed lazy loads
+   - Timeout errors
+   - Cache invalidation issues
+
+## Best Practices
+
+### 1. Load Only What's Visible
+
+```jsx
+// ✅ Good
+if (tabVisible && !dataLoaded) {
+  loadData();
+}
+
+// ❌ Bad
+loadAllData(); // Even if not visible
+```
+
+### 2. Cache Loaded Data
+
+```jsx
+// ✅ Good
+const [dataLoaded, setDataLoaded] = useState(false);
+
+if (!dataLoaded) {
+  const data = await fetchData();
+  setDataLoaded(true);
+}
+
+// ❌ Bad
+const data = await fetchData(); // Every time
+```
+
+### 3. Invalidate After Mutations
+
+```jsx
+// ✅ Good
+await updateTask();
+setHistoryLoaded(false); // Force reload
+
+// ❌ Bad
+await updateTask();
+// History shows stale data
+```
+
+### 4. Show Loading States
+
+```jsx
+// ✅ Good
+{loading ? <Spinner /> : <Content />}
+
+// ❌ Bad
+<Content /> // No feedback
+```
+
+### 5. Prevent Double Actions
+
+```jsx
+// ✅ Good
+if (isSubmitting) return;
+setIsSubmitting(true);
+
+// ❌ Bad
+setIsSubmitting(true); // Can be called twice
+```
+
+### 6. Handle Errors Gracefully
+
+Don't let failed lazy loads break the UI:
+
+```jsx
+// ✅ Good - error handling
+try {
+  await loadHistory();
+} catch (error) {
+  console.error('Failed to load history:', error);
+  showToast('Failed to load history', 'error');
+}
+
+// ❌ Bad - unhandled errors
+await loadHistory(); // Might crash
+```
+
+## Common Patterns
+
+### Modal with Tabs
+
+```jsx
+const Modal = ({ isOpen, task }) => {
+  const [activeTab, setActiveTab] = useState(0);
+  const [loaded, setLoaded] = useState({
+    history: false,
+    activity: false
+  });
+  
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(0);
+      setLoaded({ history: false, activity: false });
+    }
+  }, [isOpen]);
+  
+  const handleTabChange = (index) => {
+    setActiveTab(index);
+    
+    if (index === 1 && !loaded.history) {
+      loadHistory();
+    } else if (index === 2 && !loaded.activity) {
+      loadActivity();
+    }
+  };
+  
+  return (
+    <Tab.Group selectedIndex={activeTab} onChange={handleTabChange}>
+      {/* tabs */}
+    </Tab.Group>
+  );
+};
+```
+
+### Form with Loading
+
+```jsx
+const Form = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    try {
+      await saveData();
+      showToast('Success', 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <form onSubmit={handleSubmit} className="relative">
+      {isSubmitting && <LoadingOverlay />}
+      
+      <button disabled={isSubmitting}>
+        {isSubmitting ? 'Saving...' : 'Save'}
+      </button>
+    </form>
+  );
+};
+```
+
+## Future Optimizations
+
+Consider these improvements for better performance:
+
+### 1. Prefetching
+
+Prefetch data when user hovers over tabs:
+
+```jsx
+const handleTabHover = (index) => {
+  if (index === 1 && !historyLoaded && !loadingHistory) {
+    // Start loading in background
+    loadHistory(internalTask.id);
+  }
+};
+
+<Tab onMouseEnter={() => handleTabHover(1)}>
+  History
+</Tab>
+```
+
+### 2. Pagination
+
+Load data in chunks for large datasets:
+
+```jsx
+const loadHistory = async (taskId, page = 1, limit = 20) => {
+  const response = await fetchTaskHistory(taskId, { page, limit });
+  setHistory(prev => [...prev, ...response.data]);
+};
+```
+
+### 3. Virtual Scrolling
+
+Render only visible items for long lists:
+
+```jsx
+import { FixedSizeList } from 'react-window';
+
+<FixedSizeList
+  height={400}
+  itemCount={history.length}
+  itemSize={80}
+>
+  {({ index, style }) => (
+    <HistoryItem data={history[index]} style={style} />
+  )}
+</FixedSizeList>
+```
+
+### 4. Request Deduplication
+
+Prevent duplicate requests for the same data:
+
+```jsx
+const requestCache = new Map();
+
+const loadHistory = async (taskId) => {
+  const cacheKey = `history-${taskId}`;
+  
+  // Return existing promise if request is in flight
+  if (requestCache.has(cacheKey)) {
+    return requestCache.get(cacheKey);
+  }
+  
+  const promise = fetchTaskHistory(taskId);
+  requestCache.set(cacheKey, promise);
+  
+  try {
+    const data = await promise;
+    return data;
+  } finally {
+    requestCache.delete(cacheKey);
+  }
+};
+```
+
+### 5. Optimistic Updates
+
+Update UI immediately, revert on error:
+
+```jsx
+const updateTask = async (taskId, updates) => {
+  // Update UI immediately
+  setInternalTask(prev => ({ ...prev, ...updates }));
+  
+  try {
+    // Send to server
+    await api.patch(`/tasks/${taskId}`, updates);
+  } catch (error) {
+    // Revert on error
+    setInternalTask(originalTask);
+    showToast('Update failed', 'error');
+  }
+};
+```
+
+## Monitoring
+
+### Tools
+
+- Browser DevTools Network tab
+- React DevTools Profiler
+- Custom analytics events
+- Performance.mark() API
+
+## Testing
+
+### Test Cases
+
+1. **Lazy Loading**
+   - ✅ History not loaded on modal open
+   - ✅ History loads when tab clicked
+   - ✅ History doesn't reload on second click
+
+2. **Cache Invalidation**
+   - ✅ Cache resets after task update
+   - ✅ Cache resets when opening different task
+   - ✅ Cache persists during tab switches
+
+3. **Error Handling**
+   - ✅ Failed load shows error message
+   - ✅ Failed load doesn't break UI
+   - ✅ User can retry after failure
+
+4. **Loading States**
+   - ✅ Spinner shows while loading
+   - ✅ Spinner hides after load
+   - ✅ Loading state doesn't persist
+
+## Related Files
+
+- `src/components/TaskModal.jsx` - Reference implementation
+- `src/stores/taskStore.js` - Task data fetching
+- `src/stores/activityStore.js` - Activity data fetching
+- `src/stores/toastStore.js` - Toast notifications

@@ -15,8 +15,76 @@ Use these rules to keep changes consistent with the Mosbot dashboard codebase.
 
 ## When to use each rule
 
-- `react-ui-components.mdc`: React components and page layout patterns in `src/**/*.jsx`.
-- `state-management.mdc`: Zustand store updates in `src/stores/**/*.js`.
+### Core Patterns
+
+- `react-ui-components.mdc`: React components, page layout, loading states, and modal patterns in `src/**/*.jsx`.
+- `state-management.mdc`: Zustand store updates, async operations, and caching in `src/stores/**/*.js`.
 - `api-client.mdc`: Axios client usage in `src/api/**/*.js`.
 - `styling-tailwind.mdc`: Tailwind and shared CSS utilities in `src/**/*.css`.
 - `brand-style-guide.mdc`: Brand tone, typography, and UI styling in `src/**/*.{jsx,css}`.
+
+### Performance & UX
+
+- `performance-patterns.mdc`: Lazy loading, cache invalidation, and API call reduction.
+- `user-feedback.mdc`: Toast notifications, loading states, error handling, and progress indicators.
+
+## Key Patterns to Follow
+
+### 1. Lazy Loading
+
+Load data only when needed (e.g., on tab click, not modal open):
+
+```jsx
+const [dataLoaded, setDataLoaded] = useState(false);
+if (!dataLoaded) loadData();
+```
+
+### 2. Toast Notifications
+
+Always show feedback for user actions:
+
+```jsx
+showToast('Task updated successfully', 'success');
+showToast('Failed to save task', 'error');
+```
+
+### 3. Loading States
+
+Show progress during async operations:
+
+```jsx
+{isSubmitting && <LoadingOverlay />}
+<button disabled={isSubmitting}>
+  {isSubmitting ? 'Saving...' : 'Save'}
+</button>
+```
+
+### 4. Double-Submission Prevention
+
+Prevent duplicate actions:
+
+```jsx
+if (isSubmitting) return;
+setIsSubmitting(true);
+```
+
+### 5. Cache Invalidation
+
+Reset loaded flags after mutations:
+
+```jsx
+await updateTask();
+setHistoryLoaded(false);
+```
+
+## Quick Reference
+
+| Task | Rule to Use |
+| ---- | ----------- |
+| Adding React components | `react-ui-components.mdc` |
+| Creating/updating Zustand stores | `state-management.mdc` |
+| Adding API calls | `api-client.mdc` |
+| Styling components | `styling-tailwind.mdc` |
+| Optimizing performance | `performance-patterns.mdc` |
+| Adding user feedback | `user-feedback.mdc` |
+| Brand/design decisions | `brand-style-guide.mdc` |

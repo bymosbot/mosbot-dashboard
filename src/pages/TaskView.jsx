@@ -1,7 +1,7 @@
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTaskStore } from '../stores/taskStore';
-import Header from '../components/Header';
+import logger from '../utils/logger';
 
 const TaskModal = lazy(() => import('../components/TaskModal'));
 
@@ -27,7 +27,7 @@ export default function TaskView() {
           setIsModalOpen(true);
         }
       } catch (err) {
-        console.error('Failed to load task:', err);
+        logger.error('Failed to load task', err);
       }
     };
 
