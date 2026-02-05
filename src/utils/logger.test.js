@@ -246,7 +246,8 @@ describe('logger', () => {
 
   describe('environment context', () => {
     it('includes environment when VITE_API_URL is set', () => {
-      // Ensure VITE_API_URL is set in the mock
+      // Clear any previous global stubs and set up fresh mock
+      vi.unstubAllGlobals();
       vi.stubGlobal('import', {
         meta: {
           env: {
