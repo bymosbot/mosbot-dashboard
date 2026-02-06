@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import ReactMarkdown from 'react-markdown';
-import { DocumentTextIcon, CodeBracketIcon, PencilIcon, CheckIcon, XMarkIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, CodeBracketIcon, PencilIcon, CheckIcon, XMarkIcon, LockClosedIcon, ClipboardIcon } from '@heroicons/react/24/outline';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
@@ -99,6 +99,21 @@ export default function FilePreview({ file }) {
       showToast(error.message || 'Failed to save file', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+  
+  const handleCopy = async () => {
+    // Copy edited content if editing, otherwise copy original content
+    const textToCopy = isEditing ? editedContent : (content?.content || '');
+    
+    if (!textToCopy) return;
+    
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      showToast('File content copied to clipboard', 'success');
+    } catch (error) {
+      logger.error('Failed to copy to clipboard', error);
+      showToast('Failed to copy file content', 'error');
     }
   };
   
@@ -263,42 +278,58 @@ export default function FilePreview({ file }) {
             </p>
           </div>
           
-          {/* Edit controls - admin/owner only */}
-          {canModify && (
-            <div className="flex items-center gap-2">
-              {isEditing ? (
-                <>
+          {/* Action controls */}
+          <div className="flex items-center gap-2">
+            {/* Copy button - available to all users */}
+            {(content?.content || (isEditing && editedContent)) && (
+              <button
+                onClick={handleCopy}
+                disabled={isEditing && !editedContent}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-dark-700 text-dark-200 rounded hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={isEditing ? "Copy edited content" : "Copy file content"}
+              >
+                <ClipboardIcon className="w-4 h-4" />
+                <span>Copy</span>
+              </button>
+            )}
+            
+            {/* Edit controls - admin/owner only */}
+            {canModify && (
+              <>
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Save changes"
+                    >
+                      <CheckIcon className="w-4 h-4" />
+                      <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      disabled={isSaving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-dark-700 text-dark-200 rounded hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Cancel editing"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                      <span>Cancel</span>
+                    </button>
+                  </>
+                ) : (
                   <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Save changes"
+                    onClick={handleEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-dark-700 text-dark-200 rounded hover:bg-dark-600 transition-colors"
+                    title="Edit file"
                   >
-                    <CheckIcon className="w-4 h-4" />
-                    <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                    <PencilIcon className="w-4 h-4" />
+                    <span>Edit</span>
                   </button>
-                  <button
-                    onClick={handleCancel}
-                    disabled={isSaving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-dark-700 text-dark-200 rounded hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Cancel editing"
-                  >
-                    <XMarkIcon className="w-4 h-4" />
-                    <span>Cancel</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={handleEdit}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-dark-700 text-dark-200 rounded hover:bg-dark-600 transition-colors"
-                  title="Edit file"
-                >
-                  <PencilIcon className="w-4 h-4" />
-                  <span>Edit</span>
-                </button>
-              )}
-            </div>
-          )}
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
       

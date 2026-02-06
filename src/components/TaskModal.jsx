@@ -729,7 +729,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
     return typeof value === 'string' && value.length > 100;
   };
   
-  const getEventIcon = (eventType, meta) => {
+  const getEventIcon = (eventType, _meta) => {
     const iconClass = "w-5 h-5";
     
     switch (eventType) {
@@ -755,7 +755,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
     }
   };
   
-  const getEventColor = (eventType, meta) => {
+  const getEventColor = (eventType, _meta) => {
     switch (eventType) {
       case 'CREATED':
         return 'bg-green-500/10 text-green-400 border-green-500/20';
@@ -779,7 +779,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
     }
   };
   
-  const getEventLabel = (eventType, meta) => {
+  const getEventLabel = (eventType, _meta) => {
     switch (eventType) {
       case 'CREATED':
         return 'Created';

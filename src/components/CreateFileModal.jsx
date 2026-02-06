@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useToastStore } from '../stores/toastStore';
+import { validateFilePath, buildFullPath } from '../utils/pathValidation';
 
 export default function CreateFileModal({ isOpen, onClose, currentPath }) {
   const [fileName, setFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { createFile } = useWorkspaceStore();
+  const { createFile, listings, fetchListing } = useWorkspaceStore();
   const { showToast } = useToastStore();
 
   const handleSubmit = async (e) => {
@@ -14,40 +15,82 @@ export default function CreateFileModal({ isOpen, onClose, currentPath }) {
     
     if (isSubmitting) return;
     
-    // Validate filename
-    const trimmedName = fileName.trim();
-    if (!trimmedName) {
-      showToast('File name is required', 'error');
-      return;
-    }
-    
-    // Check for invalid characters
-    // eslint-disable-next-line no-control-regex
-    const invalidChars = /[<>:"|?*\x00-\x1F]/g;
-    if (invalidChars.test(trimmedName)) {
-      showToast('File name contains invalid characters', 'error');
-      return;
-    }
-    
-    // Check for path traversal attempts
-    if (trimmedName.includes('..') || trimmedName.includes('/')) {
-      showToast('File name cannot contain / or ..', 'error');
+    // Validate file path using utility function
+    const validation = validateFilePath(fileName);
+    if (!validation.isValid) {
+      showToast(validation.error, 'error');
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      const filePath = currentPath === '/' 
-        ? `/${trimmedName}` 
-        : `${currentPath}/${trimmedName}`;
+      // Build full path - handle nested folders
+      const trimmedName = fileName.trim();
+      const filePath = buildFullPath(currentPath, trimmedName);
+      
+      // Check if file already exists by checking all path segments
+      const pathParts = filePath.split('/').filter(Boolean);
+      let checkPath = '/';
+      
+      for (let i = 0; i < pathParts.length; i++) {
+        const part = pathParts[i];
+        const isLastPart = i === pathParts.length - 1;
+        
+        // Build the path to check
+        checkPath = checkPath === '/' ? `/${part}` : `${checkPath}/${part}`;
+        
+        // Try to get listing for parent directory
+        const parentPath = checkPath.substring(0, checkPath.lastIndexOf('/')) || '/';
+        const cacheKey = `${parentPath}:false`;
+        let listing = listings[cacheKey];
+        
+        // If not in cache, fetch it
+        if (!listing) {
+          try {
+            const result = await fetchListing({ path: parentPath, recursive: false });
+            listing = result;
+          } catch (error) {
+            // If we can't fetch the listing, the parent doesn't exist, which is fine
+            // (we'll create it). Continue checking.
+            continue;
+          }
+        }
+        
+        // Check if this path segment already exists
+        const existingItem = listing?.files?.find(f => f.path === checkPath);
+        if (existingItem) {
+          if (isLastPart) {
+            // This is the file we're trying to create
+            showToast(`A ${existingItem.type === 'directory' ? 'folder' : 'file'} named "${part}" already exists at this location`, 'error');
+            setIsSubmitting(false);
+            return;
+          } else {
+            // This is a folder in the path - it's okay if it exists
+            if (existingItem.type !== 'directory') {
+              showToast(`Cannot create file: "${part}" already exists as a file in the path`, 'error');
+              setIsSubmitting(false);
+              return;
+            }
+          }
+        }
+      }
       
       await createFile({ path: filePath, content: '' });
-      showToast(`File "${trimmedName}" created successfully`, 'success');
+      
+      // Extract just the filename for the success message
+      const displayName = trimmedName.split('/').filter(Boolean).pop() || trimmedName;
+      showToast(`File "${displayName}" created successfully`, 'success');
       setFileName('');
       onClose();
     } catch (error) {
-      showToast(error.message || 'Failed to create file', 'error');
+      // Handle specific error codes from backend
+      if (error.response?.status === 409) {
+        // Backend detected file already exists (authoritative)
+        showToast('File already exists at this location', 'error');
+      } else {
+        showToast(error.message || 'Failed to create file', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -90,21 +133,26 @@ export default function CreateFileModal({ isOpen, onClose, currentPath }) {
             <div className="space-y-4">
               <div>
                 <label htmlFor="fileName" className="block text-sm font-medium text-dark-300 mb-2">
-                  File Name
+                  File Name or Path
                 </label>
                 <input
                   type="text"
                   id="fileName"
                   value={fileName}
                   onChange={(e) => setFileName(e.target.value)}
-                  placeholder="example.txt"
+                  placeholder="example.txt or docs/README.md"
                   disabled={isSubmitting}
                   className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   autoFocus
                 />
-                <p className="mt-1 text-xs text-dark-500">
-                  Location: {currentPath === '/' ? '/' : currentPath}
-                </p>
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-dark-500">
+                    <span className="font-medium text-dark-400">Base location:</span> {currentPath === '/' ? '/' : currentPath}
+                  </p>
+                  <p className="text-xs text-dark-500">
+                    <span className="font-medium text-dark-400">Tip:</span> Use / to create nested folders (e.g., docs/guides/setup.md)
+                  </p>
+                </div>
               </div>
             </div>
             

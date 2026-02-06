@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useToastStore } from '../stores/toastStore';
+import { validateFolderName } from '../utils/pathValidation';
 
 export default function CreateFolderModal({ isOpen, onClose, currentPath }) {
   const [folderName, setFolderName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { createDirectory } = useWorkspaceStore();
+  const { createDirectory, listings, fetchListing } = useWorkspaceStore();
   const { showToast } = useToastStore();
 
   const handleSubmit = async (e) => {
@@ -14,26 +15,14 @@ export default function CreateFolderModal({ isOpen, onClose, currentPath }) {
     
     if (isSubmitting) return;
     
-    // Validate folder name
+    // Validate folder name using utility function
+    const validation = validateFolderName(folderName);
+    if (!validation.isValid) {
+      showToast(validation.error, 'error');
+      return;
+    }
+    
     const trimmedName = folderName.trim();
-    if (!trimmedName) {
-      showToast('Folder name is required', 'error');
-      return;
-    }
-    
-    // Check for invalid characters
-    // eslint-disable-next-line no-control-regex
-    const invalidChars = /[<>:"|?*\x00-\x1F]/g;
-    if (invalidChars.test(trimmedName)) {
-      showToast('Folder name contains invalid characters', 'error');
-      return;
-    }
-    
-    // Check for path traversal attempts
-    if (trimmedName.includes('..') || trimmedName.includes('/')) {
-      showToast('Folder name cannot contain / or ..', 'error');
-      return;
-    }
     
     setIsSubmitting(true);
     
@@ -42,12 +31,41 @@ export default function CreateFolderModal({ isOpen, onClose, currentPath }) {
         ? `/${trimmedName}` 
         : `${currentPath}/${trimmedName}`;
       
+      // Check if folder or file already exists at this location
+      const cacheKey = `${currentPath}:false`;
+      let listing = listings[cacheKey];
+      
+      // If not in cache, fetch it
+      if (!listing) {
+        try {
+          const result = await fetchListing({ path: currentPath, recursive: false });
+          listing = result;
+        } catch (error) {
+          // If we can't fetch the listing, continue anyway
+          // The backend will handle the error
+        }
+      }
+      
+      // Check if an item with this name already exists
+      const existingItem = listing?.files?.find(f => f.name === trimmedName);
+      if (existingItem) {
+        showToast(`A ${existingItem.type === 'directory' ? 'folder' : 'file'} named "${trimmedName}" already exists at this location`, 'error');
+        setIsSubmitting(false);
+        return;
+      }
+      
       await createDirectory({ path: folderPath });
       showToast(`Folder "${trimmedName}" created successfully`, 'success');
       setFolderName('');
       onClose();
     } catch (error) {
-      showToast(error.message || 'Failed to create folder', 'error');
+      // Handle specific error codes from backend
+      if (error.response?.status === 409) {
+        // Backend detected folder already exists (authoritative)
+        showToast('Folder already exists at this location', 'error');
+      } else {
+        showToast(error.message || 'Failed to create folder', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }

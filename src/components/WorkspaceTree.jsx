@@ -21,8 +21,9 @@ function sortFiles(files) {
   });
 }
 
-function TreeNode({ node, depth = 0, selectedPath, onSelect, onFetchChildren, childrenCache, loadingPaths, onContextMenu }) {
+function TreeNode({ node, depth = 0, selectedPath, onSelect, onFetchChildren, childrenCache, loadingPaths, onContextMenu, onDragStart, onDragOver, onDrop, canModify }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const isDirectory = node.type === 'directory';
   const isSelected = selectedPath === node.path;
   const isMarkdown = node.name.endsWith('.md');
@@ -57,14 +58,67 @@ function TreeNode({ node, depth = 0, selectedPath, onSelect, onFetchChildren, ch
     }
   };
   
+  // Drag and drop handlers
+  const handleDragStart = (e) => {
+    if (!canModify) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/json', JSON.stringify(node));
+    if (onDragStart) {
+      onDragStart(node);
+    }
+  };
+  
+  const handleDragOver = (e) => {
+    if (!canModify) return;
+    
+    // Only allow dropping on directories
+    if (isDirectory) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setIsDragOver(true);
+    }
+  };
+  
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+  
+  const handleDrop = (e) => {
+    if (!canModify) return;
+    
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    if (isDirectory) {
+      try {
+        const draggedNode = JSON.parse(e.dataTransfer.getData('application/json'));
+        if (onDrop && draggedNode.path !== node.path) {
+          onDrop(draggedNode, node);
+        }
+      } catch (error) {
+        console.error('Failed to parse dragged data:', error);
+      }
+    }
+  };
+  
   return (
     <div>
       <div
+        draggable={canModify}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={classNames(
           'flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-md transition-colors',
           isSelected 
             ? 'bg-primary-600/20 text-primary-400' 
-            : 'hover:bg-dark-800 text-dark-200'
+            : 'hover:bg-dark-800 text-dark-200',
+          isDragOver && isDirectory && 'ring-2 ring-primary-500 bg-primary-600/10',
+          canModify && 'cursor-move'
         )}
         style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
         onClick={handleClick}
@@ -119,6 +173,10 @@ function TreeNode({ node, depth = 0, selectedPath, onSelect, onFetchChildren, ch
                 childrenCache={childrenCache}
                 loadingPaths={loadingPaths}
                 onContextMenu={onContextMenu}
+                onDragStart={onDragStart}
+                onDragOver={onDragOver}
+                onDrop={onDrop}
+                canModify={canModify}
               />
             ))
           ) : !isLoading ? (
@@ -139,7 +197,11 @@ export default function WorkspaceTree({
   onFetchChildren, 
   childrenCache = {}, 
   loadingPaths = new Set(),
-  onContextMenu
+  onContextMenu,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  canModify = false
 }) {
   const sortedFiles = useMemo(() => sortFiles(files), [files]);
   
@@ -161,6 +223,10 @@ export default function WorkspaceTree({
             childrenCache={childrenCache}
             loadingPaths={loadingPaths}
             onContextMenu={onContextMenu}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            canModify={canModify}
           />
         ))
       )}

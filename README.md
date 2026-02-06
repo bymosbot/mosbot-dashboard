@@ -84,7 +84,7 @@ Pushes to `develop` or `master` branches automatically trigger deployment via Gi
 Configure these secrets in your repository (Settings → Secrets and variables → Actions):
 
 | Secret | Description | Example |
-|--------|-------------|---------|
+| ------ | ----------- | ------- |
 | `AWS_ACCESS_KEY_ID` | AWS access key for deployment | `AKIAIOSFODNN7EXAMPLE` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret access key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
 | `AWS_REGION` | AWS region for S3 bucket | `us-east-1` |
@@ -164,7 +164,7 @@ aws cloudfront create-invalidation \
 ### Environment Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+| -------- | ----------- | ------- |
 | `VITE_API_URL` | MosBot API backend URL | `http://localhost:3000/api/v1` |
 | `VITE_API_TIMEOUT` | API request timeout (ms) | `5000` |
 | `VITE_APP_NAME` | Application name | `MosBot` |
@@ -235,6 +235,21 @@ npm run test:run
 ## License
 
 MIT
+
+## Documentation
+
+### Workspace Features
+
+- **[Workspace Documentation Index](./docs/WORKSPACE_README.md)** - Complete workspace file management docs
+- **[Quick Reference](./docs/WORKSPACE_QUICK_REFERENCE.md)** - Common tasks and shortcuts
+- **[Features Guide](./docs/WORKSPACE_FEATURES_GUIDE.md)** - Visual guide with examples
+
+### Other Features
+
+- [Auto-refresh Feature](./docs/auto-refresh-feature.md)
+- [User List Permissions](./docs/user-list-permissions-frontend.md)
+- [File Metadata Display](./docs/file-metadata-display.md)
+- [Cloudflare Access Setup](./docs/cloudflare-access-setup.md)
 
 ## Support
 

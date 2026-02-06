@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import logger from '../utils/logger';
 
 export const useWorkspaceStore = create((set, get) => ({
   // Listing state
@@ -263,6 +264,147 @@ export const useWorkspaceStore = create((set, get) => ({
       const errorMessage = error.response?.data?.error?.message 
         || error.message 
         || 'Failed to create directory';
+      throw new Error(errorMessage);
+    }
+  },
+  
+  // Move/rename a file or directory
+  moveFile: async ({ sourcePath, destinationPath }) => {
+    let fileCreated = false;
+    
+    // Log move operation start
+    logger.info('Move operation started', {
+      sourcePath,
+      destinationPath,
+      operation: 'moveFile'
+    });
+    
+    try {
+      // For files: read content, create at new location, delete old location
+      // For directories: not supported yet (would need recursive operation)
+      
+      // First, fetch the file content
+      const contentResponse = await api.get('/openclaw/workspace/files/content', {
+        params: { path: sourcePath }
+      });
+      
+      const { content, encoding } = contentResponse.data.data;
+      
+      // Create file at new location
+      await api.post('/openclaw/workspace/files', {
+        path: destinationPath,
+        content,
+        encoding: encoding || 'utf8'
+      });
+      fileCreated = true;
+      
+      logger.info('File created at destination', {
+        sourcePath,
+        destinationPath,
+        operation: 'moveFile',
+        step: 'create'
+      });
+      
+      // Delete old file
+      try {
+        await api.delete('/openclaw/workspace/files', {
+          params: { path: sourcePath }
+        });
+        
+        logger.info('Move operation completed successfully', {
+          sourcePath,
+          destinationPath,
+          operation: 'moveFile',
+          step: 'complete'
+        });
+      } catch (deleteError) {
+        // Rollback: if delete fails, attempt to remove the newly created file
+        // to prevent orphaned files
+        logger.error('Failed to delete source file after move. Attempting rollback', deleteError, {
+          sourcePath,
+          destinationPath,
+          operation: 'moveFile',
+          step: 'delete',
+          rollback: true
+        });
+        
+        try {
+          await api.delete('/openclaw/workspace/files', {
+            params: { path: destinationPath }
+          });
+          logger.info('Rollback successful: removed destination file', {
+            sourcePath,
+            destinationPath,
+            operation: 'moveFile',
+            step: 'rollback',
+            success: true
+          });
+        } catch (rollbackError) {
+          // Rollback failed - log error but don't throw (we'll throw the original delete error)
+          logger.error('Rollback failed: could not remove destination file', rollbackError, {
+            sourcePath,
+            destinationPath,
+            operation: 'moveFile',
+            step: 'rollback',
+            success: false,
+            orphanedFile: destinationPath
+          });
+        }
+        
+        // Invalidate caches before throwing error
+        const sourceParent = sourcePath.substring(0, sourcePath.lastIndexOf('/')) || '/';
+        const destParent = destinationPath.substring(0, destinationPath.lastIndexOf('/')) || '/';
+        
+        get().clearListingCache(sourceParent, false);
+        get().clearListingCache(sourceParent, true);
+        get().clearListingCache(destParent, false);
+        get().clearListingCache(destParent, true);
+        get().clearContentCache(sourcePath);
+        get().clearContentCache(destinationPath);
+        
+        const deleteErrorMessage = deleteError.response?.data?.error?.message 
+          || deleteError.message 
+          || 'Failed to delete source file';
+        throw new Error(`Move operation incomplete: ${deleteErrorMessage}. File may exist at both locations.`);
+      }
+      
+      // Invalidate caches for both source and destination directories
+      const sourceParent = sourcePath.substring(0, sourcePath.lastIndexOf('/')) || '/';
+      const destParent = destinationPath.substring(0, destinationPath.lastIndexOf('/')) || '/';
+      
+      get().clearListingCache(sourceParent, false);
+      get().clearListingCache(sourceParent, true);
+      get().clearListingCache(destParent, false);
+      get().clearListingCache(destParent, true);
+      get().clearContentCache(sourcePath);
+      
+      // If moved item was selected, update selection
+      const { selectedFile } = get();
+      if (selectedFile?.path === sourcePath) {
+        set({ selectedFile: null });
+      }
+      
+      return true;
+    } catch (error) {
+      // If file was created but we're throwing an error, invalidate destination cache
+      if (fileCreated) {
+        const destParent = destinationPath.substring(0, destinationPath.lastIndexOf('/')) || '/';
+        get().clearListingCache(destParent, false);
+        get().clearListingCache(destParent, true);
+        get().clearContentCache(destinationPath);
+      }
+      
+      logger.error('Move operation failed', error, {
+        sourcePath,
+        destinationPath,
+        operation: 'moveFile',
+        fileCreated,
+        step: fileCreated ? 'delete' : 'create'
+      });
+      
+      const errorMessage = error.response?.data?.error?.message 
+        || error.message 
+        || 'Failed to move file';
       throw new Error(errorMessage);
     }
   }

@@ -18,15 +18,20 @@ describe('CreateFileModal', () => {
   const mockOnClose = vi.fn();
   const mockCreateFile = vi.fn();
   const mockShowToast = vi.fn();
+  const mockFetchListing = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     useWorkspaceStore.mockReturnValue({
       createFile: mockCreateFile,
+      listings: {},
+      fetchListing: mockFetchListing,
     });
     useToastStore.mockReturnValue({
       showToast: mockShowToast,
     });
+    // Default: no existing items in listing
+    mockFetchListing.mockResolvedValue({ files: [] });
   });
 
   it('does not render when isOpen is false', () => {
@@ -43,7 +48,7 @@ describe('CreateFileModal', () => {
     );
 
     expect(screen.getByText('Create New File')).toBeInTheDocument();
-    expect(screen.getByLabelText('File Name')).toBeInTheDocument();
+    expect(screen.getByLabelText(/File Name or Path/)).toBeInTheDocument();
   });
 
   it('displays current path', () => {
@@ -51,7 +56,8 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/documents" />
     );
 
-    expect(screen.getByText(/Location: \/documents/)).toBeInTheDocument();
+    expect(screen.getByText('Base location:')).toBeInTheDocument();
+    expect(screen.getByText('/documents')).toBeInTheDocument();
   });
 
   it('displays root path correctly', () => {
@@ -59,7 +65,8 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    expect(screen.getByText(/Location: \//)).toBeInTheDocument();
+    expect(screen.getByText('Base location:')).toBeInTheDocument();
+    expect(screen.getByText('/')).toBeInTheDocument();
   });
 
   it('allows typing file name', async () => {
@@ -68,7 +75,7 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'test.txt');
 
     expect(input).toHaveValue('test.txt');
@@ -82,7 +89,7 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'newfile.txt');
 
     const submitButton = screen.getByText('Create File');
@@ -107,7 +114,7 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/documents" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'document.txt');
 
     const submitButton = screen.getByText('Create File');
@@ -128,7 +135,7 @@ describe('CreateFileModal', () => {
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
-    expect(mockShowToast).toHaveBeenCalledWith('File name is required', 'error');
+    expect(mockShowToast).toHaveBeenCalledWith('Path is required', 'error');
     expect(mockCreateFile).not.toHaveBeenCalled();
   });
 
@@ -138,13 +145,13 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, '   ');
 
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
-    expect(mockShowToast).toHaveBeenCalledWith('File name is required', 'error');
+    expect(mockShowToast).toHaveBeenCalledWith('Path is required', 'error');
   });
 
   it('shows error for invalid characters', async () => {
@@ -153,34 +160,36 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'file<name>.txt');
 
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
     expect(mockShowToast).toHaveBeenCalledWith(
-      'File name contains invalid characters',
+      'Path contains invalid characters',
       'error'
     );
   });
 
-  it('shows error for path traversal attempts with /', async () => {
+  it('allows nested paths with /', async () => {
     const user = userEvent.setup();
+    mockCreateFile.mockResolvedValue({});
+
     render(
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'path/to/file.txt');
 
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
-    expect(mockShowToast).toHaveBeenCalledWith(
-      'File name cannot contain / or ..',
-      'error'
-    );
+    expect(mockCreateFile).toHaveBeenCalledWith({
+      path: '/path/to/file.txt',
+      content: '',
+    });
   });
 
   it('shows error for path traversal attempts with ..', async () => {
@@ -189,14 +198,14 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, '../file.txt');
 
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
     expect(mockShowToast).toHaveBeenCalledWith(
-      'File name cannot contain / or ..',
+      'Path cannot contain ..',
       'error'
     );
   });
@@ -210,7 +219,7 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'test.txt');
 
     const submitButton = screen.getByText('Create File');
@@ -228,7 +237,7 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'test.txt');
 
     const submitButton = screen.getByText('Create File');
@@ -275,7 +284,7 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, 'test.txt');
 
     const submitButton = screen.getByText('Create File');
@@ -296,7 +305,7 @@ describe('CreateFileModal', () => {
       <CreateFileModal isOpen={true} onClose={mockOnClose} currentPath="/" />
     );
 
-    const input = screen.getByLabelText('File Name');
+    const input = screen.getByLabelText(/File Name or Path/);
     await user.type(input, '  test.txt  ');
 
     const submitButton = screen.getByText('Create File');

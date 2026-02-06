@@ -31,7 +31,8 @@ export default function WorkspaceExplorer() {
     fetchListing,
     setSelectedFile,
     setCurrentPath,
-    clearErrors
+    clearErrors,
+    moveFile
   } = useWorkspaceStore();
   
   const { isAdmin } = useAuthStore();
@@ -196,6 +197,59 @@ export default function WorkspaceExplorer() {
   
   const handleView = (file) => {
     setSelectedFile(file);
+  };
+  
+  // Drag and drop handlers
+  const handleDragStart = (_node) => {
+    // Node is tracked by WorkspaceTree component
+  };
+  
+  const handleDrop = async (draggedNode, targetNode) => {
+    if (!canModify) return;
+    
+    // Prevent dropping a folder into itself or its descendants
+    if (draggedNode.path === targetNode.path || targetNode.path.startsWith(draggedNode.path + '/')) {
+      showToast('Cannot move a folder into itself', 'error');
+      return;
+    }
+    
+    // Only support moving files for now (directories would require recursive operations)
+    if (draggedNode.type === 'directory') {
+      showToast('Moving folders is not yet supported', 'error');
+      return;
+    }
+    
+    try {
+      // Build destination path
+      const fileName = draggedNode.name;
+      const destinationPath = targetNode.path === '/' 
+        ? `/${fileName}` 
+        : `${targetNode.path}/${fileName}`;
+      
+      // Check if file already exists at destination
+      const targetListing = listings[`${targetNode.path}:false`];
+      if (targetListing?.files?.some(f => f.name === fileName)) {
+        if (!window.confirm(`A file named "${fileName}" already exists in the destination. Overwrite it?`)) {
+          return;
+        }
+      }
+      
+      await moveFile({ 
+        sourcePath: draggedNode.path, 
+        destinationPath 
+      });
+      
+      showToast(`Moved "${fileName}" successfully`, 'success');
+      
+      // Refresh both source and destination directories
+      const sourceParent = draggedNode.path.substring(0, draggedNode.path.lastIndexOf('/')) || '/';
+      await fetchListing({ path: sourceParent, force: true });
+      if (sourceParent !== targetNode.path) {
+        await fetchListing({ path: targetNode.path, force: true });
+      }
+    } catch (error) {
+      showToast(error.message || 'Failed to move file', 'error');
+    }
   };
   
   // Keyboard shortcuts
@@ -392,6 +446,9 @@ export default function WorkspaceExplorer() {
               childrenCache={childrenCache}
               loadingPaths={loadingPaths}
               onContextMenu={handleContextMenu}
+              onDragStart={handleDragStart}
+              onDrop={handleDrop}
+              canModify={canModify}
             />
           ) : (
             <div className="py-2">

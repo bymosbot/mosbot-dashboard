@@ -18,15 +18,20 @@ describe('CreateFolderModal', () => {
   const mockOnClose = vi.fn();
   const mockCreateDirectory = vi.fn();
   const mockShowToast = vi.fn();
+  const mockFetchListing = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     useWorkspaceStore.mockReturnValue({
       createDirectory: mockCreateDirectory,
+      listings: {},
+      fetchListing: mockFetchListing,
     });
     useToastStore.mockReturnValue({
       showToast: mockShowToast,
     });
+    // Default: no existing items in listing
+    mockFetchListing.mockResolvedValue({ files: [] });
   });
 
   it('does not render when isOpen is false', () => {
