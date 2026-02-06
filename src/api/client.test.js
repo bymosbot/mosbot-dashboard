@@ -1,6 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest';
-import { useBotStore } from '../stores/botStore';
-import logger from '../utils/logger';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  vi,
+} from "vitest";
+import { useBotStore } from "../stores/botStore";
+import logger from "../utils/logger";
 
 // Mock axios before importing client
 const mockAxiosInstance = {
@@ -18,15 +26,16 @@ const mockAxiosInstance = {
     },
   },
   defaults: {
-    baseURL: 'http://localhost:3000/api',
+    baseURL: "http://localhost:3000/api",
     timeout: 10000,
+    withCredentials: true,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   },
 };
 
-vi.mock('axios', () => {
+vi.mock("axios", () => {
   // Create mock instance inside factory to avoid hoisting issues
   const mockInstance = {
     get: vi.fn(),
@@ -43,14 +52,15 @@ vi.mock('axios', () => {
       },
     },
     defaults: {
-      baseURL: 'http://localhost:3000/api',
+      baseURL: "http://localhost:3000/api",
       timeout: 10000,
+      withCredentials: true,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     },
   };
-  
+
   return {
     default: {
       create: vi.fn(() => mockInstance),
@@ -59,14 +69,14 @@ vi.mock('axios', () => {
 });
 
 // Mock botStore
-vi.mock('../stores/botStore', () => ({
+vi.mock("../stores/botStore", () => ({
   useBotStore: {
     getState: vi.fn(),
   },
 }));
 
 // Mock logger
-vi.mock('../utils/logger', () => ({
+vi.mock("../utils/logger", () => ({
   default: {
     error: vi.fn(),
   },
@@ -82,8 +92,8 @@ const localStorageMock = {
 global.localStorage = localStorageMock;
 
 // Import after mocks
-import { api } from './client';
-import axios from 'axios';
+import { api } from "./client";
+import axios from "axios";
 
 // Get the mock instance that was created
 const getMockAxiosInstance = () => {
@@ -95,7 +105,7 @@ const getMockAxiosInstance = () => {
   return api;
 };
 
-describe('api client', () => {
+describe("api client", () => {
   let botStoreState;
   let requestInterceptor;
   let requestErrorHandler;
@@ -145,22 +155,22 @@ describe('api client', () => {
     vi.useRealTimers();
   });
 
-  describe('request interceptor', () => {
-    it('adds Authorization header when token exists', () => {
-      const token = 'test-token-123';
+  describe("request interceptor", () => {
+    it("adds Authorization header when token exists", () => {
+      const token = "test-token-123";
       localStorageMock.getItem.mockReturnValue(token);
 
       // Use stored request interceptor
-      
+
       const config = { headers: {} };
       const result = requestInterceptor(config);
 
-      expect(localStorageMock.getItem).toHaveBeenCalledWith('auth_token');
+      expect(localStorageMock.getItem).toHaveBeenCalledWith("auth_token");
       expect(result.headers.Authorization).toBe(`Bearer ${token}`);
       expect(botStoreState.requestStarted).toHaveBeenCalled();
     });
 
-    it('does not add Authorization header when no token', () => {
+    it("does not add Authorization header when no token", () => {
       localStorageMock.getItem.mockReturnValue(null);
 
       const config = { headers: {} };
@@ -170,73 +180,73 @@ describe('api client', () => {
       expect(botStoreState.requestStarted).toHaveBeenCalled();
     });
 
-    it('tracks request start in botStore', () => {
+    it("tracks request start in botStore", () => {
       requestInterceptor({ headers: {} });
 
       expect(botStoreState.requestStarted).toHaveBeenCalled();
     });
 
-    it('tracks request finish on request setup error', async () => {
+    it("tracks request finish on request setup error", async () => {
       const errorHandler = requestErrorHandler;
-      const error = new Error('Request setup failed');
-      
+      const error = new Error("Request setup failed");
+
       await errorHandler(error).catch(() => {});
 
       expect(botStoreState.requestFinished).toHaveBeenCalled();
     });
   });
 
-  describe('response interceptor', () => {
-    it('tracks request finish on successful response', () => {
+  describe("response interceptor", () => {
+    it("tracks request finish on successful response", () => {
       const successHandler = responseInterceptor;
-      const response = { data: {}, config: { method: 'get' } };
-      
+      const response = { data: {}, config: { method: "get" } };
+
       successHandler(response);
 
       expect(botStoreState.requestFinished).toHaveBeenCalled();
     });
 
-    it('records success for mutation requests (POST)', () => {
+    it("records success for mutation requests (POST)", () => {
       const successHandler = responseInterceptor;
-      const response = { data: {}, config: { method: 'post' } };
-      
+      const response = { data: {}, config: { method: "post" } };
+
       successHandler(response);
 
       expect(botStoreState.requestFinished).toHaveBeenCalled();
       expect(botStoreState.recordSuccess).toHaveBeenCalled();
     });
 
-    it('records success for mutation requests (PUT)', () => {
+    it("records success for mutation requests (PUT)", () => {
       const successHandler = responseInterceptor;
-      const response = { data: {}, config: { method: 'put' } };
-      
+      const response = { data: {}, config: { method: "put" } };
+
       successHandler(response);
 
       expect(botStoreState.recordSuccess).toHaveBeenCalled();
     });
 
-    it('records success for mutation requests (PATCH)', () => {
+    it("records success for mutation requests (PATCH)", () => {
       const successHandler = responseInterceptor;
-      const response = { data: {}, config: { method: 'patch' } };
-      
+      const response = { data: {}, config: { method: "patch" } };
+
       successHandler(response);
 
       expect(botStoreState.recordSuccess).toHaveBeenCalled();
     });
 
-    it('records success for mutation requests (DELETE)', () => {
+    it("records success for mutation requests (DELETE)", () => {
       const successHandler = responseInterceptor;
-      const response = { data: {}, config: { method: 'delete' } };
-      
+      const response = { data: {}, config: { method: "delete" } };
+
       successHandler(response);
 
       expect(botStoreState.recordSuccess).toHaveBeenCalled();
     });
 
-    it('does not record success for GET requests', () => {
+    it("does not record success for GET requests", () => {
       const successHandler = responseInterceptor;
-      const response = { data: {}, config: { method: 'get' } };
-      
+      const response = { data: {}, config: { method: "get" } };
+
       successHandler(response);
 
       expect(botStoreState.requestFinished).toHaveBeenCalled();
@@ -244,26 +254,26 @@ describe('api client', () => {
     });
   });
 
-  describe('retry logic', () => {
-    it('should retry on network error (no response)', async () => {
+  describe("retry logic", () => {
+    it("should retry on network error (no response)", async () => {
       const networkError = {
-        message: 'Network Error',
+        message: "Network Error",
         config: {
-          url: '/test',
-          method: 'get',
+          url: "/test",
+          method: "get",
           __retryCount: 0,
         },
       };
 
       const errorHandler = responseErrorHandler;
-      
+
       // Mock api.get to simulate retry
-      api.get.mockResolvedValueOnce({ data: {}, config: { method: 'get' } });
+      api.get.mockResolvedValueOnce({ data: {}, config: { method: "get" } });
 
       const promise = errorHandler(networkError);
       // Advance timer for retry delay
       vi.advanceTimersByTime(2000);
-      
+
       // Should attempt retry (will call api which calls mockAxiosInstance.get)
       await promise.catch(() => {}); // Catch since we're not fully implementing retry
 
@@ -271,21 +281,21 @@ describe('api client', () => {
       expect(networkError.config.__retryCount).toBeDefined();
     });
 
-    it('should retry on 500 status code', async () => {
+    it("should retry on 500 status code", async () => {
       const serverError = {
         response: {
           status: 500,
-          statusText: 'Internal Server Error',
+          statusText: "Internal Server Error",
         },
         config: {
-          url: '/test',
-          method: 'get',
+          url: "/test",
+          method: "get",
           __retryCount: 0,
         },
       };
 
       const errorHandler = responseErrorHandler;
-      api.get.mockResolvedValueOnce({ data: {}, config: { method: 'get' } });
+      api.get.mockResolvedValueOnce({ data: {}, config: { method: "get" } });
 
       const promise = errorHandler(serverError);
       vi.advanceTimersByTime(2000);
@@ -294,7 +304,7 @@ describe('api client', () => {
       expect(serverError.config.__retryCount).toBeDefined();
     });
 
-    it('should retry on retryable status codes (502, 503, 504, 408, 429)', async () => {
+    it("should retry on retryable status codes (502, 503, 504, 408, 429)", async () => {
       const retryableErrors = [
         { response: { status: 502 } },
         { response: { status: 503 } },
@@ -306,9 +316,9 @@ describe('api client', () => {
       const errorHandler = responseErrorHandler;
 
       for (const error of retryableErrors) {
-        error.config = { url: '/test', method: 'get', __retryCount: 0 };
-        api.get.mockResolvedValueOnce({ data: {}, config: { method: 'get' } });
-        
+        error.config = { url: "/test", method: "get", __retryCount: 0 };
+        api.get.mockResolvedValueOnce({ data: {}, config: { method: "get" } });
+
         const promise = errorHandler(error);
         vi.advanceTimersByTime(2000);
         await promise.catch(() => {});
@@ -317,10 +327,16 @@ describe('api client', () => {
       }
     });
 
-    it('should not retry on non-retryable status codes (400, 404)', async () => {
+    it("should not retry on non-retryable status codes (400, 404)", async () => {
       const nonRetryableErrors = [
-        { response: { status: 400 }, config: { url: '/test', method: 'get', __retryCount: 0 } },
-        { response: { status: 404 }, config: { url: '/test', method: 'get', __retryCount: 0 } },
+        {
+          response: { status: 400 },
+          config: { url: "/test", method: "get", __retryCount: 0 },
+        },
+        {
+          response: { status: 404 },
+          config: { url: "/test", method: "get", __retryCount: 0 },
+        },
       ];
 
       const errorHandler = responseErrorHandler;
@@ -332,17 +348,17 @@ describe('api client', () => {
     });
   });
 
-  describe('error handling', () => {
-    it('logs error with response details', async () => {
+  describe("error handling", () => {
+    it("logs error with response details", async () => {
       const error = {
         response: {
           status: 400, // Non-retryable status to skip retry logic
-          statusText: 'Bad Request',
-          data: { error: 'Server error' },
+          statusText: "Bad Request",
+          data: { error: "Server error" },
         },
         config: {
-          url: '/test',
-          method: 'get',
+          url: "/test",
+          method: "get",
           __retryCount: 0,
         },
       };
@@ -350,22 +366,22 @@ describe('api client', () => {
       await responseErrorHandler(error).catch(() => {});
 
       expect(logger.error).toHaveBeenCalledWith(
-        'API request failed',
+        "API request failed",
         error,
         expect.objectContaining({
-          url: '/test',
-          method: 'get',
+          url: "/test",
+          method: "get",
           status: 400,
         })
       );
     });
 
-    it('logs error with request details when no response', async () => {
+    it("logs error with request details when no response", async () => {
       const error = {
         request: {},
         config: {
-          url: '/test',
-          method: 'get',
+          url: "/test",
+          method: "get",
           __retryCount: 3, // Set to max retries to skip retry logic
         },
       };
@@ -373,19 +389,19 @@ describe('api client', () => {
       await responseErrorHandler(error).catch(() => {});
 
       expect(logger.error).toHaveBeenCalledWith(
-        'Network request failed',
+        "Network request failed",
         error,
         expect.objectContaining({
-          url: '/test',
-          method: 'get',
+          url: "/test",
+          method: "get",
         })
       );
     });
 
-    it('records error in botStore on failure', async () => {
+    it("records error in botStore on failure", async () => {
       const error = {
         response: { status: 400 }, // Non-retryable
-        config: { url: '/test', method: 'get', __retryCount: 0 },
+        config: { url: "/test", method: "get", __retryCount: 0 },
       };
 
       await responseErrorHandler(error).catch(() => {});
@@ -395,17 +411,21 @@ describe('api client', () => {
     });
   });
 
-  describe('base configuration', () => {
-    it('has correct baseURL', () => {
+  describe("base configuration", () => {
+    it("has correct baseURL", () => {
       expect(api.defaults.baseURL).toBeDefined();
     });
 
-    it('has correct timeout', () => {
+    it("has correct timeout", () => {
       expect(api.defaults.timeout).toBe(10000);
     });
 
-    it('has correct content type header', () => {
-      expect(api.defaults.headers['Content-Type']).toBe('application/json');
+    it("has withCredentials enabled for cookie support", () => {
+      expect(api.defaults.withCredentials).toBe(true);
+    });
+
+    it("has correct content type header", () => {
+      expect(api.defaults.headers["Content-Type"]).toBe("application/json");
     });
   });
 });
