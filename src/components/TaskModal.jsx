@@ -618,6 +618,37 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
   const formatHistoryEntry = (entry) => {
     const changes = [];
     
+    // Special handling for comment events
+    if (entry.meta?.action === 'comment_created') {
+      changes.push({
+        field: 'Comment',
+        fieldKey: 'comment_body',
+        oldValue: null,
+        newValue: entry.meta.comment_body || '(no content)'
+      });
+      return changes;
+    }
+    
+    if (entry.meta?.action === 'comment_updated') {
+      changes.push({
+        field: 'Comment',
+        fieldKey: 'comment_body',
+        oldValue: entry.old_values?.comment_body || '(no content)',
+        newValue: entry.new_values?.comment_body || '(no content)'
+      });
+      return changes;
+    }
+    
+    if (entry.meta?.action === 'comment_deleted') {
+      changes.push({
+        field: 'Comment',
+        fieldKey: 'comment_body',
+        oldValue: entry.old_values?.comment_body || '(no content)',
+        newValue: null
+      });
+      return changes;
+    }
+    
     if (entry.old_values && entry.new_values) {
       Object.keys(entry.new_values).forEach(key => {
         const oldVal = entry.old_values[key];
@@ -639,6 +670,18 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
   };
   
   const formatValue = (value, isLongText = false, fieldKey = null) => {
+    // Special handling for comment_body - show preview
+    if (fieldKey === 'comment_body') {
+      if (value === null || value === undefined) return '(deleted)';
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return '(empty)';
+        // Show first 150 chars with ellipsis if longer
+        return trimmed.length > 150 ? trimmed.substring(0, 150) + '...' : trimmed;
+      }
+      return String(value);
+    }
+    
     // Special handling for assignee_id - look up user name
     if (fieldKey === 'assignee_id') {
       if (value === null || value === undefined || value === '') {
@@ -682,8 +725,20 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
     return typeof value === 'string' && value.length > 100;
   };
   
-  const getEventIcon = (eventType) => {
+  const getEventIcon = (eventType, meta) => {
     const iconClass = "w-5 h-5";
+    
+    // Check for comment events in meta
+    if (meta?.action === 'comment_created') {
+      return <ChatBubbleLeftRightIcon className={iconClass} />;
+    }
+    if (meta?.action === 'comment_updated') {
+      return <PencilIcon className={iconClass} />;
+    }
+    if (meta?.action === 'comment_deleted') {
+      return <TrashIcon className={iconClass} />;
+    }
+    
     switch (eventType) {
       case 'CREATED':
         return <PlusCircleIcon className={iconClass} />;
@@ -701,7 +756,18 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
     }
   };
   
-  const getEventColor = (eventType) => {
+  const getEventColor = (eventType, meta) => {
+    // Check for comment events in meta
+    if (meta?.action === 'comment_created') {
+      return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+    }
+    if (meta?.action === 'comment_updated') {
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    }
+    if (meta?.action === 'comment_deleted') {
+      return 'bg-red-500/10 text-red-400 border-red-500/20';
+    }
+    
     switch (eventType) {
       case 'CREATED':
         return 'bg-green-500/10 text-green-400 border-green-500/20';
@@ -719,7 +785,18 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
     }
   };
   
-  const getEventLabel = (eventType) => {
+  const getEventLabel = (eventType, meta) => {
+    // Check for comment events in meta
+    if (meta?.action === 'comment_created') {
+      return 'Comment added';
+    }
+    if (meta?.action === 'comment_updated') {
+      return 'Comment edited';
+    }
+    if (meta?.action === 'comment_deleted') {
+      return 'Comment deleted';
+    }
+    
     switch (eventType) {
       case 'CREATED':
         return 'Created';
@@ -1179,9 +1256,9 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                   {/* Icon */}
                                   <div className={classNames(
                                     "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border",
-                                    getEventColor(entry.event_type)
+                                    getEventColor(entry.event_type, entry.meta)
                                   )}>
-                                    {getEventIcon(entry.event_type)}
+                                    {getEventIcon(entry.event_type, entry.meta)}
                                   </div>
                                   
                                   {/* Content */}
@@ -1189,7 +1266,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                     <div className="flex items-start justify-between gap-3 mb-2">
                                       <div className="flex-1">
                                         <p className="font-semibold text-dark-100 text-sm">
-                                          {getEventLabel(entry.event_type)}
+                                          {getEventLabel(entry.event_type, entry.meta)}
                                         </p>
                                         <p className="text-xs text-dark-400 mt-0.5">
                                           by {entry.actor_name || 'System'}
