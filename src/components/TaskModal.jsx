@@ -669,10 +669,14 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
     return changes;
   };
   
-  const formatValue = (value, isLongText = false, fieldKey = null) => {
+  const formatValue = (value, isLongText = false, fieldKey = null, isOldValue = false) => {
     // Special handling for comment_body - show preview
     if (fieldKey === 'comment_body') {
-      if (value === null || value === undefined) return '(deleted)';
+      if (value === null || value === undefined) {
+        // For old value: null means it's a new comment (didn't exist before)
+        // For new value: null means it was deleted
+        return isOldValue ? '(new)' : '(deleted)';
+      }
       if (typeof value === 'string') {
         const trimmed = value.trim();
         if (!trimmed) return '(empty)';
@@ -1311,7 +1315,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                         </div>
                                                       ) : (
                                                         <p className="text-xs text-dark-300 whitespace-pre-wrap break-words">
-                                                          {formatValue(change.oldValue, true, change.fieldKey)}
+                                                          {formatValue(change.oldValue, true, change.fieldKey, true)}
                                                         </p>
                                                       )}
                                                     </div>
@@ -1345,7 +1349,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                         </div>
                                                       ) : (
                                                         <p className="text-xs text-dark-300 whitespace-pre-wrap break-words">
-                                                          {formatValue(change.newValue, true, change.fieldKey)}
+                                                          {formatValue(change.newValue, true, change.fieldKey, false)}
                                                         </p>
                                                       )}
                                                     </div>
@@ -1383,7 +1387,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                         </div>
                                                       ) : (
                                                         <p className="text-xs text-dark-300 break-words">
-                                                          {formatValue(change.oldValue, true, change.fieldKey)}
+                                                          {formatValue(change.oldValue, true, change.fieldKey, true)}
                                                         </p>
                                                       )}
                                                     </div>
@@ -1417,7 +1421,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                         </div>
                                                       ) : (
                                                         <p className="text-xs text-dark-300 break-words">
-                                                          {formatValue(change.newValue, true, change.fieldKey)}
+                                                          {formatValue(change.newValue, true, change.fieldKey, false)}
                                                         </p>
                                                       )}
                                                     </div>

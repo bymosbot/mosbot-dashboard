@@ -15,7 +15,7 @@ Task history now properly displays comment-related events with custom icons, col
 
 **Example:**
 
-```
+```bash
 [💬] Comment added
     by John Doe
     06/02/2026, 5:49:26 pm
@@ -32,7 +32,7 @@ Task history now properly displays comment-related events with custom icons, col
 
 **Example:**
 
-```
+```bash
 [✏️] Comment edited
     by Jane Smith
     06/02/2026, 5:50:15 pm
@@ -51,7 +51,7 @@ Task history now properly displays comment-related events with custom icons, col
 
 **Example:**
 
-```
+```bash
 [🗑️] Comment deleted
     by Admin User
     06/02/2026, 5:51:00 pm
@@ -80,7 +80,8 @@ Comment events are detected by checking the `event_type` field in the task log e
 
 **Special Values:**
 
-- `null` or `undefined` → "(deleted)"
+- `null` or `undefined` in old value → "(new)" - indicates comment was just created
+- `null` or `undefined` in new value → "(deleted)" - indicates comment was deleted
 - Empty string → "(empty)"
 
 **Example:**
