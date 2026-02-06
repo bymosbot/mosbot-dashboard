@@ -160,6 +160,18 @@ export default function FilePreview({ file }) {
               <div className="flex-1">
                 <h3 className="font-semibold text-dark-100">{file.name}</h3>
                 <p className="text-xs text-dark-400 flex items-center gap-2">
+                  {file.size && (
+                    <>
+                      {(file.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KB
+                      <span className="text-dark-600">•</span>
+                    </>
+                  )}
+                  {file.modified && (
+                    <>
+                      Modified {new Date(file.modified).toLocaleString()}
+                      <span className="text-dark-600">•</span>
+                    </>
+                  )}
                   <LockClosedIcon className="w-3 h-3" />
                   Access restricted
                 </p>
