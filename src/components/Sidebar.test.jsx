@@ -220,7 +220,7 @@ describe('Sidebar', () => {
       );
 
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.getByText('Docs')).toBeInTheDocument();
+      expect(screen.getByText('Workspace')).toBeInTheDocument();
       expect(screen.getByText('Log')).toBeInTheDocument();
       expect(screen.getByText('Settings')).toBeInTheDocument();
       expect(screen.getByText('Archived')).toBeInTheDocument();

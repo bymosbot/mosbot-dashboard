@@ -1,11 +1,11 @@
 import Header from '../components/Header';
 import WorkspaceExplorer from '../components/WorkspaceExplorer';
 
-export default function Docs() {
+export default function Workspace() {
   return (
     <div className="flex flex-col h-full">
       <Header 
-        title="Documentation" 
+        title="Workspace" 
         subtitle="Browse and preview workspace files"
       />
       

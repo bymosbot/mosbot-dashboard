@@ -3,7 +3,7 @@ import { useState, Fragment, Suspense, lazy } from 'react';
 import { Menu, Transition } from '@headlessui/react';
 import {
   ChartBarIcon,
-  DocumentTextIcon,
+  FolderIcon,
   ClipboardDocumentListIcon,
   ArchiveBoxIcon,
   Cog6ToothIcon,
@@ -19,7 +19,7 @@ const BotAvatar = lazy(() => import('./BotAvatar'));
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: ChartBarIcon },
-  { name: 'Docs', href: '/docs', icon: DocumentTextIcon },
+  { name: 'Workspace', href: '/workspace', icon: FolderIcon },
   { name: 'Log', href: '/log', icon: ClipboardDocumentListIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon, subpages: [
     { name: 'Users', href: '/settings/users', icon: UserIcon },

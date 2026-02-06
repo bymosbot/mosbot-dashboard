@@ -195,7 +195,7 @@ export default function Log() {
     <div className="flex flex-col h-full">
       <Header 
         title="Activity Log" 
-        subtitle={`A chronological record of Klaus's actions and completed tasks • ${displayLogs.length} ${displayLogs.length === 1 ? 'entry' : 'entries'}`}
+        subtitle={`A chronological record of the bot's actions and completed tasks • ${displayLogs.length} ${displayLogs.length === 1 ? 'entry' : 'entries'}`}
       />
       
       <div className="flex-1 p-6 overflow-y-auto bg-dark-950">
