@@ -177,7 +177,7 @@ export const useWorkspaceStore = create((set, get) => ({
         encoding
       });
       
-      // Invalidate parent directory cache
+      // Invalidate parent directory cache after successful creation
       const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
       get().clearListingCache(parentPath, false);
       get().clearListingCache(parentPath, true);
@@ -200,7 +200,7 @@ export const useWorkspaceStore = create((set, get) => ({
         encoding
       });
       
-      // Invalidate file content cache and parent directory cache
+      // Invalidate file content cache and parent directory cache after successful update
       get().clearContentCache(path);
       const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
       get().clearListingCache(parentPath, false);
@@ -222,7 +222,7 @@ export const useWorkspaceStore = create((set, get) => ({
         params: { path }
       });
       
-      // Invalidate caches
+      // Invalidate caches after successful deletion
       get().clearContentCache(path);
       const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
       get().clearListingCache(parentPath, false);
@@ -254,7 +254,7 @@ export const useWorkspaceStore = create((set, get) => ({
         encoding: 'utf8'
       });
       
-      // Invalidate parent directory cache
+      // Invalidate parent directory cache after successful creation
       const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
       get().clearListingCache(parentPath, false);
       get().clearListingCache(parentPath, true);

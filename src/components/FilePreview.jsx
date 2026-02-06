@@ -13,7 +13,8 @@ export default function FilePreview({ file, onDelete }) {
     isLoadingContent, 
     contentError,
     fetchFileContent,
-    updateFile
+    updateFile,
+    fetchListing
   } = useWorkspaceStore();
   
   const { isAdmin, user } = useAuthStore();
@@ -93,6 +94,11 @@ export default function FilePreview({ file, onDelete }) {
         content: editedContent,
         encoding: content?.encoding || 'utf8'
       });
+      
+      // Refetch parent directory listing to update the UI
+      const parentPath = file.path.substring(0, file.path.lastIndexOf('/')) || '/';
+      await fetchListing({ path: parentPath, recursive: false, force: true });
+      
       showToast('File saved successfully', 'success');
       setIsEditing(false);
     } catch (error) {
