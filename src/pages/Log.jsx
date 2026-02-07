@@ -258,7 +258,7 @@ export default function Log() {
                                 </Link>
                               )}
                             </div>
-                            <p className="text-sm text-dark-400 leading-relaxed">
+                            <p className="text-sm text-dark-400 leading-relaxed whitespace-pre-line">
                               {log.description}
                             </p>
                           </div>
