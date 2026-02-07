@@ -7,6 +7,7 @@ import {
   SparklesIcon,
   ArrowTrendingUpIcon,
   MagnifyingGlassIcon,
+  BoltIcon,
 } from '@heroicons/react/24/outline';
 import { PRIORITY_CONFIG, TASK_PRIORITY, TASK_TYPE_CONFIG, TASK_TYPE } from '../utils/constants';
 import { formatRelativeTime, truncateText, classNames } from '../utils/helpers';
@@ -20,6 +21,7 @@ const ICON_MAP = {
   SparklesIcon,
   ArrowTrendingUpIcon,
   MagnifyingGlassIcon,
+  BoltIcon,
 };
 
 export default function TaskCard({ task, onClick }) {
@@ -46,11 +48,18 @@ export default function TaskCard({ task, onClick }) {
         isDragging ? 'opacity-50 scale-95' : 'opacity-100 scale-100'
       )}
     >
-      {/* Header with type icon */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <h3 className="text-sm font-semibold text-dark-100 flex-1">
-          {task.title}
-        </h3>
+      {/* Header with task key and type icon */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1">
+          {task.task_number && (
+            <span className="text-xs font-mono text-dark-500 mb-1 block">
+              TASK-{task.task_number}
+            </span>
+          )}
+          <h3 className="text-sm font-semibold text-dark-100">
+            {task.title}
+          </h3>
+        </div>
         {TypeIcon && (
           <TypeIcon 
             className={classNames('w-5 h-5 flex-shrink-0', typeConfig.color)} 

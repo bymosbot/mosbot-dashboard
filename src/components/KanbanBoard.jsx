@@ -1,15 +1,37 @@
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useTaskStore } from '../stores/taskStore';
+import { useToastStore } from '../stores/toastStore';
 import Column from './Column';
 import { KANBAN_COLUMNS } from '../utils/constants';
 
 export default function KanbanBoard({ onTaskClick }) {
   const { moveTask, getFilteredTasks, isRefreshing } = useTaskStore();
+  const { showToast } = useToastStore();
   const tasks = getFilteredTasks();
 
   const handleTaskDrop = async (taskId, newStatus) => {
-    await moveTask(taskId, newStatus);
+    try {
+      await moveTask(taskId, newStatus);
+    } catch (error) {
+      // Handle dependency blocking (409 Conflict)
+      if (error.response?.status === 409) {
+        const blockingTasks = error.response?.data?.error?.blocking_tasks || [];
+        const taskKeys = blockingTasks
+          .map(t => t.key || t.task_number ? `TASK-${t.task_number}` : t.id || 'Unknown task')
+          .filter(Boolean)
+          .join(', ');
+        showToast(
+          `Task is blocked by: ${taskKeys || 'unfinished dependencies'}`,
+          'error'
+        );
+      } else {
+        showToast(
+          error.response?.data?.error?.message || 'Failed to move task',
+          'error'
+        );
+      }
+    }
   };
 
   // Ensure tasks is always an array

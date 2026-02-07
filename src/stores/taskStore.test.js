@@ -17,6 +17,7 @@ vi.mock('../api/client', () => ({
 vi.mock('../utils/logger', () => ({
   default: {
     error: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -171,6 +172,97 @@ describe('taskStore', () => {
       expect(result).toEqual(mockTask);
       expect(useTaskStore.getState().tasks).toContainEqual(mockTask);
       expect(useTaskStore.getState().isLoading).toBe(false);
+    });
+
+    it('successfully fetches a task by task key (TASK-1234)', async () => {
+      const mockTask = { id: 1, title: 'Task 1', status: 'todo', task_number: 1234 };
+
+      api.get.mockResolvedValue({
+        data: {
+          data: mockTask,
+        },
+      });
+
+      const result = await useTaskStore.getState().fetchTaskById('TASK-1234');
+
+      expect(api.get).toHaveBeenCalledWith('/tasks/key/TASK-1234');
+      expect(result).toEqual(mockTask);
+      expect(useTaskStore.getState().tasks).toContainEqual(mockTask);
+      expect(useTaskStore.getState().isLoading).toBe(false);
+    });
+
+    it('falls back to UUID endpoint when task key endpoint returns 404', async () => {
+      const mockTask = { id: 'uuid-123', title: 'Task 1', status: 'todo' };
+      const keyError = new Error('Not found');
+      keyError.response = { status: 404 };
+
+      // First call (task key endpoint) fails with 404
+      api.get.mockRejectedValueOnce(keyError);
+      // Second call (UUID endpoint) succeeds
+      api.get.mockResolvedValueOnce({
+        data: {
+          data: mockTask,
+        },
+      });
+
+      const result = await useTaskStore.getState().fetchTaskById('TASK-1234');
+
+      expect(api.get).toHaveBeenCalledWith('/tasks/key/TASK-1234');
+      expect(api.get).toHaveBeenCalledWith('/tasks/TASK-1234');
+      expect(result).toEqual(mockTask);
+      expect(logger.warn).toHaveBeenCalled();
+    });
+
+    it('falls back to UUID endpoint when task key endpoint returns 400', async () => {
+      const mockTask = { id: 'uuid-123', title: 'Task 1', status: 'todo' };
+      const keyError = new Error('Bad request');
+      keyError.response = { status: 400 };
+
+      // First call (task key endpoint) fails with 400
+      api.get.mockRejectedValueOnce(keyError);
+      // Second call (UUID endpoint) succeeds
+      api.get.mockResolvedValueOnce({
+        data: {
+          data: mockTask,
+        },
+      });
+
+      const result = await useTaskStore.getState().fetchTaskById('TASK-1234');
+
+      expect(api.get).toHaveBeenCalledWith('/tasks/key/TASK-1234');
+      expect(api.get).toHaveBeenCalledWith('/tasks/TASK-1234');
+      expect(result).toEqual(mockTask);
+      expect(logger.warn).toHaveBeenCalled();
+    });
+
+    it('throws error when both task key and UUID endpoints fail', async () => {
+      const keyError = new Error('Not found');
+      keyError.response = { status: 404 };
+      const uuidError = new Error('Task not found');
+      uuidError.response = { status: 404 };
+
+      // Both calls fail
+      api.get.mockRejectedValueOnce(keyError);
+      api.get.mockRejectedValueOnce(uuidError);
+
+      await expect(useTaskStore.getState().fetchTaskById('TASK-1234')).rejects.toThrow();
+
+      expect(api.get).toHaveBeenCalledWith('/tasks/key/TASK-1234');
+      expect(api.get).toHaveBeenCalledWith('/tasks/TASK-1234');
+      expect(useTaskStore.getState().error).toBe('Task not found: TASK-1234');
+      expect(logger.error).toHaveBeenCalled();
+    });
+
+    it('does not fallback when task key endpoint fails with non-404/400 error', async () => {
+      const keyError = new Error('Server error');
+      keyError.response = { status: 500 };
+
+      api.get.mockRejectedValueOnce(keyError);
+
+      await expect(useTaskStore.getState().fetchTaskById('TASK-1234')).rejects.toThrow();
+
+      expect(api.get).toHaveBeenCalledWith('/tasks/key/TASK-1234');
+      expect(api.get).toHaveBeenCalledTimes(1); // No fallback call
     });
 
     it('updates existing task in store', async () => {
@@ -423,6 +515,34 @@ describe('taskStore', () => {
       await useTaskStore.getState().moveTask(999, 'in-progress');
 
       expect(api.patch).not.toHaveBeenCalled();
+    });
+
+    it('re-throws 409 Conflict errors for dependency blocking', async () => {
+      const task = { id: 1, title: 'Task 1', status: 'todo' };
+      useTaskStore.setState({ tasks: [task] });
+
+      const blockingError = new Error('Task is blocked by dependencies');
+      blockingError.response = {
+        status: 409,
+        data: {
+          error: {
+            message: 'Task is blocked by dependencies',
+            blocking_tasks: [
+              { key: 'TASK-123', task_number: 123 },
+              { key: 'TASK-456', task_number: 456 },
+            ],
+          },
+        },
+      };
+
+      api.patch.mockRejectedValue(blockingError);
+
+      await expect(useTaskStore.getState().moveTask(1, 'in-progress')).rejects.toThrow();
+
+      // Should revert optimistic update
+      expect(useTaskStore.getState().tasks[0].status).toBe('todo');
+      // Error should be re-thrown (not caught and swallowed)
+      expect(logger.error).toHaveBeenCalledWith('Failed to move task', blockingError);
     });
   });
 

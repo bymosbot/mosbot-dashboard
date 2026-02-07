@@ -22,6 +22,7 @@ export const TASK_TYPE = {
   FEATURE: 'feature',
   IMPROVEMENT: 'improvement',
   RESEARCH: 'research',
+  EPIC: 'epic',
 };
 
 export const COLUMNS = [
@@ -143,5 +144,10 @@ export const TASK_TYPE_CONFIG = {
     label: 'Research',
     icon: 'MagnifyingGlassIcon',
     color: 'text-yellow-500',
+  },
+  [TASK_TYPE.EPIC]: {
+    label: 'Epic',
+    icon: 'BoltIcon',
+    color: 'text-amber-500',
   },
 };

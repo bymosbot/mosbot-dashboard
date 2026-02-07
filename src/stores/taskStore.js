@@ -46,17 +46,44 @@ export const useTaskStore = create((set, get) => ({
     await get().fetchTasks({ silent: true });
   },
   
-  // Fetch a single task by ID
-  fetchTaskById: async (taskId) => {
+  // Fetch a single task by ID or key (supports both UUID and TASK-1234 format)
+  fetchTaskById: async (identifier) => {
     set({ isLoading: true, error: null });
+    let errorAlreadyHandled = false;
     try {
-      const response = await api.get(`/tasks/${taskId}`);
+      // Determine if identifier is a task key (TASK-1234) or UUID
+      const isTaskKey = /^TASK-\d+$/i.test(identifier);
+      const endpoint = isTaskKey ? `/tasks/key/${identifier}` : `/tasks/${identifier}`;
+      
+      let response;
+      try {
+        response = await api.get(endpoint);
+      } catch (keyError) {
+        // If task key endpoint fails (e.g., 404), fallback to UUID endpoint
+        if (isTaskKey && (keyError.response?.status === 404 || keyError.response?.status === 400)) {
+          logger.warn(`Task key endpoint failed for ${identifier}, falling back to UUID endpoint`, keyError);
+          // Try UUID endpoint as fallback
+          try {
+            response = await api.get(`/tasks/${identifier}`);
+          } catch (fallbackError) {
+            // Both endpoints failed - set custom error message
+            errorAlreadyHandled = true;
+            set({ error: `Task not found: ${identifier}`, isLoading: false });
+            logger.error('Failed to fetch task (both key and UUID endpoints failed)', fallbackError);
+            throw fallbackError;
+          }
+        } else {
+          // Re-throw if it's not a 404/400 or if we're already using UUID endpoint
+          throw keyError;
+        }
+      }
+      
       // API returns { data: {...} }
       const task = response.data.data;
       
       // Update the task in the store if it exists, otherwise add it
       set((state) => {
-        const existingIndex = state.tasks.findIndex(t => t.id === taskId);
+        const existingIndex = state.tasks.findIndex(t => t.id === task.id);
         if (existingIndex >= 0) {
           const updatedTasks = [...state.tasks];
           updatedTasks[existingIndex] = task;
@@ -68,7 +95,10 @@ export const useTaskStore = create((set, get) => ({
       
       return task;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      // Only set error message if it wasn't already handled (e.g., both endpoints failed)
+      if (!errorAlreadyHandled) {
+        set({ error: error.message, isLoading: false });
+      }
       logger.error('Failed to fetch task', error);
       throw error;
     }
@@ -164,6 +194,11 @@ export const useTaskStore = create((set, get) => ({
         error: error.message,
       }));
       logger.error('Failed to move task', error);
+      
+      // Re-throw 409 errors for dependency blocking
+      if (error.response?.status === 409) {
+        throw error;
+      }
     }
   },
   
@@ -187,7 +222,8 @@ export const useTaskStore = create((set, get) => ({
     return tasks.filter((task) => {
       const title = (task.title || '').toLowerCase();
       const description = (task.description || '').toLowerCase();
-      return title.includes(query) || description.includes(query);
+      const taskKey = task.task_number ? `task-${task.task_number}` : '';
+      return title.includes(query) || description.includes(query) || taskKey.includes(query);
     });
   },
   

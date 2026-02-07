@@ -60,6 +60,16 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [activityLoaded, setActivityLoaded] = useState(false);
   
+  // Dependencies data
+  const [dependencies, setDependencies] = useState({ depends_on: [], dependents: [] });
+  const [loadingDependencies, setLoadingDependencies] = useState(false);
+  const [dependenciesLoaded, setDependenciesLoaded] = useState(false);
+  
+  // Subtasks data
+  const [subtasks, setSubtasks] = useState([]);
+  const [loadingSubtasks, setLoadingSubtasks] = useState(false);
+  const [subtasksLoaded, setSubtasksLoaded] = useState(false);
+  
   // Active tab index (0: Comments, 1: History, 2: Activity)
   const [activeTab, setActiveTab] = useState(0);
   
@@ -200,14 +210,22 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
         setHistoryLoaded(false);
         setActivityLoaded(false);
         setCommentsLoaded(false);
+        setDependenciesLoaded(false);
+        setSubtasksLoaded(false);
         setComments([]);
         setCommentDraft('');
+        setDependencies({ depends_on: [], dependents: [] });
+        setSubtasks([]);
         
         // Don't fetch history and activity immediately - wait for tab click
         // This improves performance by only loading data when needed
 
         // Comments are the default tab, so load them immediately in view mode
         loadComments(task.id, { force: true });
+        
+        // Load dependencies and subtasks immediately for relationship display
+        loadDependencies(task.id);
+        loadSubtasks(task.id);
       } else {
         setTags([]);
         setTagInput('');
@@ -225,9 +243,13 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
         setActivity([]);
         setComments([]);
         setCommentDraft('');
+        setDependencies({ depends_on: [], dependents: [] });
+        setSubtasks([]);
         setHistoryLoaded(false);
         setActivityLoaded(false);
         setCommentsLoaded(false);
+        setDependenciesLoaded(false);
+        setSubtasksLoaded(false);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,6 +284,46 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
       logger.error('Failed to load activity', error);
     } finally {
       setLoadingActivity(false);
+    }
+  };
+
+  // Load dependencies
+  const loadDependencies = async (taskId) => {
+    if (loadingDependencies || dependenciesLoaded) return;
+    
+    setLoadingDependencies(true);
+    try {
+      const response = await api.get(`/tasks/${taskId}/dependencies`);
+      setDependencies(response.data.data || { depends_on: [], dependents: [] });
+      setDependenciesLoaded(true);
+    } catch (error) {
+      logger.error('Failed to load dependencies', error);
+      showToast(
+        error.response?.data?.error?.message || 'Failed to load task dependencies',
+        'error'
+      );
+    } finally {
+      setLoadingDependencies(false);
+    }
+  };
+
+  // Load subtasks
+  const loadSubtasks = async (taskId) => {
+    if (loadingSubtasks || subtasksLoaded) return;
+    
+    setLoadingSubtasks(true);
+    try {
+      const response = await api.get(`/tasks/${taskId}/subtasks`);
+      setSubtasks(response.data.data || []);
+      setSubtasksLoaded(true);
+    } catch (error) {
+      logger.error('Failed to load subtasks', error);
+      showToast(
+        error.response?.data?.error?.message || 'Failed to load subtasks',
+        'error'
+      );
+    } finally {
+      setLoadingSubtasks(false);
     }
   };
   
@@ -454,10 +516,31 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
       }
     } catch (error) {
       logger.error('Failed to save task', error);
-      showToast(
-        error.response?.data?.error?.message || 'Failed to save task',
-        'error'
-      );
+      
+      // Handle dependency blocking (409 Conflict)
+      if (error.response?.status === 409) {
+        const blockingTasks = error.response?.data?.error?.blocking_tasks || [];
+        if (blockingTasks.length > 0) {
+          const taskKeys = blockingTasks
+            .map(t => t.key || (t.task_number ? `TASK-${t.task_number}` : t.id || 'Unknown task'))
+            .filter(Boolean)
+            .join(', ');
+          showToast(
+            `Task is blocked by: ${taskKeys}. Complete these tasks first.`,
+            'error'
+          );
+        } else {
+          showToast(
+            error.response?.data?.error?.message || 'Task is blocked by dependencies',
+            'error'
+          );
+        }
+      } else {
+        showToast(
+          error.response?.data?.error?.message || 'Failed to save task',
+          'error'
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -513,7 +596,9 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
 
   const handleShare = async () => {
     if (internalTask) {
-      const taskUrl = `${window.location.origin}/task/${internalTask.id}`;
+      // Use task key (TASK-####) in URL if available, otherwise fall back to UUID
+      const identifier = internalTask.task_number ? `TASK-${internalTask.task_number}` : internalTask.id;
+      const taskUrl = `${window.location.origin}/task/${identifier}`;
       try {
         await navigator.clipboard.writeText(taskUrl);
         setCopied(true);
@@ -840,8 +925,10 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                     <Dialog.Title className="text-xl font-semibold text-dark-100">
                       {internalTask ? (mode === 'view' ? formData.title : 'Edit Task') : 'Create New Task'}
                     </Dialog.Title>
-                    {internalTask && mode === 'view' && (
-                      <p className="text-xs text-dark-500 mt-1 font-mono">ID: {internalTask.id}</p>
+                    {internalTask && mode === 'view' && internalTask.task_number && (
+                      <p className="text-xs text-primary-400 mt-1 font-mono font-semibold">
+                        TASK-{internalTask.task_number}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
@@ -1003,6 +1090,104 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                             </div>
                           </div>
                         </div>
+                    </div>
+                    
+                    {/* Dependencies and Relationships Section */}
+                    <div className="grid grid-cols-2 gap-4 mt-6">
+                      {/* Dependencies */}
+                      <div className="bg-dark-800 p-4 rounded-lg">
+                        <h3 className="text-sm font-medium text-dark-200 mb-3 flex items-center gap-2">
+                          <BoltIcon className="w-4 h-4" />
+                          Dependencies
+                        </h3>
+                        
+                        {/* Blocked By */}
+                        <div className="mb-3">
+                          <label className="block text-xs font-medium text-dark-500 mb-1">Blocked By</label>
+                          {loadingDependencies ? (
+                            <p className="text-xs text-dark-500">Loading...</p>
+                          ) : dependencies.depends_on.length > 0 ? (
+                            <div className="space-y-1">
+                              {dependencies.depends_on.map((dep) => (
+                                <div key={dep.id} className="text-xs text-dark-300 flex items-center gap-2">
+                                  <span className="font-mono text-primary-400">TASK-{dep.task_number}</span>
+                                  <span className="flex-1 truncate">{dep.title}</span>
+                                  <span className={classNames(
+                                    'px-1.5 py-0.5 rounded text-[10px]',
+                                    STATUS_CONFIG[dep.status]?.color || 'bg-dark-700 text-dark-300'
+                                  )}>
+                                    {STATUS_CONFIG[dep.status]?.label || dep.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-dark-500">No blocking dependencies</p>
+                          )}
+                        </div>
+                        
+                        {/* Blocking */}
+                        <div>
+                          <label className="block text-xs font-medium text-dark-500 mb-1">Blocking</label>
+                          {dependencies.dependents.length > 0 ? (
+                            <div className="space-y-1">
+                              {dependencies.dependents.map((dep) => (
+                                <div key={dep.id} className="text-xs text-dark-300 flex items-center gap-2">
+                                  <span className="font-mono text-primary-400">TASK-{dep.task_number}</span>
+                                  <span className="flex-1 truncate">{dep.title}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-dark-500">Not blocking any tasks</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Parent/Epic and Subtasks */}
+                      <div className="bg-dark-800 p-4 rounded-lg">
+                        <h3 className="text-sm font-medium text-dark-200 mb-3">
+                          Epic & Subtasks
+                        </h3>
+                        
+                        {/* Parent/Epic */}
+                        <div className="mb-3">
+                          <label className="block text-xs font-medium text-dark-500 mb-1">Parent Epic</label>
+                          {internalTask.parent_task_id ? (
+                            <p className="text-xs text-dark-300">
+                              <span className="font-mono text-primary-400">TASK-{internalTask.parent_task_number || '?'}</span>
+                              {' '}{internalTask.parent_task_title || 'Loading...'}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-dark-500">No parent epic</p>
+                          )}
+                        </div>
+                        
+                        {/* Subtasks */}
+                        <div>
+                          <label className="block text-xs font-medium text-dark-500 mb-1">Subtasks</label>
+                          {loadingSubtasks ? (
+                            <p className="text-xs text-dark-500">Loading...</p>
+                          ) : subtasks.length > 0 ? (
+                            <div className="space-y-1">
+                              {subtasks.map((sub) => (
+                                <div key={sub.id} className="text-xs text-dark-300 flex items-center gap-2">
+                                  <span className="font-mono text-primary-400">TASK-{sub.task_number}</span>
+                                  <span className="flex-1 truncate">{sub.title}</span>
+                                  <span className={classNames(
+                                    'px-1.5 py-0.5 rounded text-[10px]',
+                                    STATUS_CONFIG[sub.status]?.color || 'bg-dark-700 text-dark-300'
+                                  )}>
+                                    {STATUS_CONFIG[sub.status]?.label || sub.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-dark-500">No subtasks</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Archive Notices */}
