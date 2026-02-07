@@ -51,11 +51,18 @@ export default function TaskCard({ task, onClick }) {
       {/* Header with task key and type icon */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1">
-          {task.task_number && (
-            <span className="text-xs font-mono text-dark-500 mb-1 block">
-              TASK-{task.task_number}
-            </span>
-          )}
+          <div className="flex items-center gap-2 mb-1">
+            {task.task_number && (
+              <span className="text-xs font-mono text-dark-500">
+                TASK-{task.task_number}
+              </span>
+            )}
+            {task.parent_task_number && (
+              <span className="text-xs text-dark-600">
+                Epic: TASK-{task.parent_task_number}
+              </span>
+            )}
+          </div>
           <h3 className="text-sm font-semibold text-dark-100">
             {task.title}
           </h3>
