@@ -17,6 +17,7 @@ import {
 } from "@heroicons/react/24/outline";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { useTaskStore } from "../stores/taskStore";
 import { useActivityStore } from "../stores/activityStore";
 import { useAuthStore } from "../stores/authStore";
@@ -1179,7 +1180,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                               </label>
                               <div className="prose prose-invert prose-sm max-w-none text-dark-200 bg-dark-800 p-4 rounded-lg">
                                 <ReactMarkdown
-                                  remarkPlugins={[remarkGfm]}
+                                  remarkPlugins={[remarkGfm, remarkBreaks]}
                                   components={{
                                     h1: ({ _node, ...props }) => (
                                       <h1
@@ -2027,6 +2028,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                             <ReactMarkdown
                                                               remarkPlugins={[
                                                                 remarkGfm,
+                                                                remarkBreaks,
                                                               ]}
                                                               components={{
                                                                 h1: ({
@@ -2243,6 +2245,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                             <ReactMarkdown
                                                               remarkPlugins={[
                                                                 remarkGfm,
+                                                                remarkBreaks,
                                                               ]}
                                                               components={{
                                                                 h1: ({
@@ -2463,6 +2466,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                             <ReactMarkdown
                                                               remarkPlugins={[
                                                                 remarkGfm,
+                                                                remarkBreaks,
                                                               ]}
                                                               components={{
                                                                 h1: ({
@@ -2679,6 +2683,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                                             <ReactMarkdown
                                                               remarkPlugins={[
                                                                 remarkGfm,
+                                                                remarkBreaks,
                                                               ]}
                                                               components={{
                                                                 h1: ({
@@ -2965,7 +2970,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                     </div>
                                     <div className="prose prose-invert prose-xs max-w-none text-dark-400 mb-3">
                                       <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
+                                        remarkPlugins={[remarkGfm, remarkBreaks]}
                                         components={{
                                           p: ({ _node, ...props }) => (
                                             <p

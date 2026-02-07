@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { DocumentTextIcon, CodeBracketIcon, PencilIcon, CheckIcon, XMarkIcon, LockClosedIcon, ClipboardIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useAuthStore } from '../stores/authStore';
@@ -370,7 +371,7 @@ export default function FilePreview({ file, onDelete }) {
         ) : isMarkdown ? (
           <div className="prose prose-invert prose-sm max-w-none">
             <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
+              remarkPlugins={[remarkGfm, remarkBreaks]}
               components={{
                 table: ({_node, ...props}) => <table className="w-full border-collapse border border-dark-700 my-4" {...props} />,
                 thead: ({_node, ...props}) => <thead className="bg-dark-900" {...props} />,
