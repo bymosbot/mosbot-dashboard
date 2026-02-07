@@ -55,6 +55,16 @@ const ICON_MAP = {
   BoltIcon,
 };
 
+// Unicode icons for dropdown options (since select options can't render React components)
+const TASK_TYPE_UNICODE_ICONS = {
+  task: '✓',
+  bug: '⚠',
+  feature: '✨',
+  improvement: '↗',
+  research: '🔍',
+  epic: '⚡',
+};
+
 export default function TaskModal({ isOpen, onClose, task = null }) {
   const { createTask, updateTask, deleteTask, fetchTaskHistory } =
     useTaskStore();
@@ -455,10 +465,21 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
       setDependencyType("blocked_by");
       setShowAddDependency(false);
       
-      // Reload dependencies - reset loaded flag and fetch fresh data
+      // Force reload dependencies by resetting all flags
       setDependenciesLoaded(false);
-      setLoadingDependencies(false); // Reset loading flag to allow reload
-      await loadDependencies(internalTask.id);
+      setLoadingDependencies(false);
+      
+      // Trigger immediate reload with loading state
+      setLoadingDependencies(true);
+      try {
+        const response = await api.get(`/tasks/${internalTask.id}/dependencies`);
+        setDependencies(response.data.data || { depends_on: [], dependents: [] });
+        setDependenciesLoaded(true);
+      } catch (error) {
+        logger.error("Failed to reload dependencies", error);
+      } finally {
+        setLoadingDependencies(false);
+      }
     } catch (error) {
       logger.error("Failed to add dependency", error);
       showToast(
@@ -479,9 +500,18 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
       
       showToast("Dependency removed successfully", "success");
       
-      // Reload dependencies
+      // Force reload dependencies with loading state
       setDependenciesLoaded(false);
-      await loadDependencies(internalTask.id);
+      setLoadingDependencies(true);
+      try {
+        const response = await api.get(`/tasks/${internalTask.id}/dependencies`);
+        setDependencies(response.data.data || { depends_on: [], dependents: [] });
+        setDependenciesLoaded(true);
+      } catch (error) {
+        logger.error("Failed to reload dependencies", error);
+      } finally {
+        setLoadingDependencies(false);
+      }
     } catch (error) {
       logger.error("Failed to remove dependency", error);
       showToast(
@@ -1506,12 +1536,11 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                   <option value="">Select a task...</option>
                                   {availableTasks.map((task) => {
                                     const taskType = task.type || TASK_TYPE.TASK;
-                                    const typeConfig = TASK_TYPE_CONFIG[taskType];
-                                    const typeIcon = typeConfig?.icon ? `${typeConfig.icon.replace('Icon', '')} ` : '';
+                                    const typeIcon = TASK_TYPE_UNICODE_ICONS[taskType] || '✓';
                                     const epicInfo = task.parent_task_number ? ` [Epic: TASK-${task.parent_task_number}]` : '';
                                     return (
                                       <option key={task.id} value={task.id}>
-                                        {typeConfig?.label || 'Task'} • TASK-{task.task_number} - {task.title}{epicInfo}
+                                        {typeIcon} TASK-{task.task_number} - {task.title}{epicInfo}
                                       </option>
                                     );
                                   })}
