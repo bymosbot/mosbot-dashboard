@@ -102,6 +102,13 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
   // Submit loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Dependency management state
+  const [showAddDependency, setShowAddDependency] = useState(false);
+  const [selectedDependencyTask, setSelectedDependencyTask] = useState("");
+  const [availableTasks, setAvailableTasks] = useState([]);
+  const [loadingAvailableTasks, setLoadingAvailableTasks] = useState(false);
+  const [isAddingDependency, setIsAddingDependency] = useState(false);
+
   // Tags state
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
@@ -376,6 +383,83 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
       );
     } finally {
       setLoadingSubtasks(false);
+    }
+  };
+
+  // Load available tasks for dependency dropdown
+  const loadAvailableTasks = async () => {
+    if (!internalTask) return;
+    
+    setLoadingAvailableTasks(true);
+    try {
+      const response = await api.get("/tasks");
+      // Filter out current task, archived tasks, and already dependent tasks
+      const currentDependencyIds = new Set([
+        internalTask.id,
+        ...dependencies.depends_on.map(d => d.id),
+        ...dependencies.dependents.map(d => d.id)
+      ]);
+      
+      const available = (response.data.data || []).filter(
+        (t) => !currentDependencyIds.has(t.id) && t.status !== "ARCHIVE"
+      );
+      setAvailableTasks(available);
+    } catch (error) {
+      logger.error("Failed to load available tasks", error);
+      showToast("Failed to load tasks", "error");
+    } finally {
+      setLoadingAvailableTasks(false);
+    }
+  };
+
+  // Add dependency
+  const handleAddDependency = async () => {
+    if (!selectedDependencyTask || !internalTask || isAddingDependency) return;
+
+    setIsAddingDependency(true);
+    try {
+      await api.post(`/tasks/${internalTask.id}/dependencies`, {
+        depends_on_task_id: selectedDependencyTask
+      });
+      
+      showToast("Dependency added successfully", "success");
+      
+      // Reload dependencies
+      setDependenciesLoaded(false);
+      await loadDependencies(internalTask.id);
+      
+      // Reset form
+      setSelectedDependencyTask("");
+      setShowAddDependency(false);
+    } catch (error) {
+      logger.error("Failed to add dependency", error);
+      showToast(
+        error.response?.data?.error?.message || "Failed to add dependency",
+        "error"
+      );
+    } finally {
+      setIsAddingDependency(false);
+    }
+  };
+
+  // Remove dependency
+  const handleRemoveDependency = async (dependsOnTaskId) => {
+    if (!internalTask) return;
+
+    try {
+      await api.delete(`/tasks/${internalTask.id}/dependencies/${dependsOnTaskId}`);
+      
+      showToast("Dependency removed successfully", "success");
+      
+      // Reload dependencies
+      setDependenciesLoaded(false);
+      await loadDependencies(internalTask.id);
+    } catch (error) {
+      logger.error("Failed to remove dependency", error);
+      showToast(
+        error.response?.data?.error?.message || "Failed to remove dependency",
+        "error"
+      );
     }
   };
 
@@ -1351,9 +1435,61 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
 
                         {/* Blocked By */}
                         <div className="mb-3">
-                          <label className="block text-xs font-medium text-dark-500 mb-1">
-                            Blocked By
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-medium text-dark-500">
+                              Blocked By
+                            </label>
+                            {mode === "view" && !showAddDependency && (
+                              <button
+                                onClick={() => {
+                                  setShowAddDependency(true);
+                                  loadAvailableTasks();
+                                }}
+                                className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1"
+                              >
+                                <PlusCircleIcon className="w-3 h-3" />
+                                Add
+                              </button>
+                            )}
+                          </div>
+                          
+                          {showAddDependency && (
+                            <div className="mb-2 p-2 bg-dark-900 rounded border border-dark-700">
+                              <select
+                                value={selectedDependencyTask}
+                                onChange={(e) => setSelectedDependencyTask(e.target.value)}
+                                className="input-field text-xs mb-2"
+                                disabled={loadingAvailableTasks || isAddingDependency}
+                              >
+                                <option value="">Select a task...</option>
+                                {availableTasks.map((task) => (
+                                  <option key={task.id} value={task.id}>
+                                    TASK-{task.task_number} - {task.title}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleAddDependency}
+                                  disabled={!selectedDependencyTask || isAddingDependency}
+                                  className="btn-primary text-xs py-1 px-2 flex-1"
+                                >
+                                  {isAddingDependency ? "Adding..." : "Add Dependency"}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setShowAddDependency(false);
+                                    setSelectedDependencyTask("");
+                                  }}
+                                  className="btn-secondary text-xs py-1 px-2"
+                                  disabled={isAddingDependency}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          
                           {loadingDependencies ? (
                             <p className="text-xs text-dark-500">Loading...</p>
                           ) : dependencies.depends_on.length > 0 ? (
@@ -1361,7 +1497,7 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                               {dependencies.depends_on.map((dep) => (
                                 <div
                                   key={dep.id}
-                                  className="text-xs text-dark-300 flex items-center gap-2"
+                                  className="text-xs text-dark-300 flex items-center gap-2 group"
                                 >
                                   <span className="font-mono text-primary-400">
                                     TASK-{dep.task_number}
@@ -1379,6 +1515,15 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                     {STATUS_CONFIG[dep.status]?.label ||
                                       dep.status}
                                   </span>
+                                  {mode === "view" && (
+                                    <button
+                                      onClick={() => handleRemoveDependency(dep.id)}
+                                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
+                                      title="Remove dependency"
+                                    >
+                                      <XMarkIcon className="w-3 h-3" />
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -2818,9 +2963,51 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                         </span>
                                       )}
                                     </div>
-                                    <p className="text-xs text-dark-400 mb-3 leading-relaxed">
-                                      {entry.description}
-                                    </p>
+                                    <div className="prose prose-invert prose-xs max-w-none text-dark-400 mb-3">
+                                      <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                          p: ({ _node, ...props }) => (
+                                            <p
+                                              className="text-xs leading-relaxed mb-2 last:mb-0"
+                                              {...props}
+                                            />
+                                          ),
+                                          ul: ({ _node, ...props }) => (
+                                            <ul
+                                              className="list-disc list-inside text-xs space-y-1 mb-2 last:mb-0"
+                                              {...props}
+                                            />
+                                          ),
+                                          ol: ({ _node, ...props }) => (
+                                            <ol
+                                              className="list-decimal list-inside text-xs space-y-1 mb-2 last:mb-0"
+                                              {...props}
+                                            />
+                                          ),
+                                          li: ({ _node, ...props }) => (
+                                            <li className="text-xs" {...props} />
+                                          ),
+                                          strong: ({ _node, ...props }) => (
+                                            <strong
+                                              className="font-semibold text-dark-300"
+                                              {...props}
+                                            />
+                                          ),
+                                          em: ({ _node, ...props }) => (
+                                            <em className="italic" {...props} />
+                                          ),
+                                          code: ({ _node, ...props }) => (
+                                            <code
+                                              className="bg-dark-800 px-1 py-0.5 rounded text-xs font-mono"
+                                              {...props}
+                                            />
+                                          ),
+                                        }}
+                                      >
+                                        {entry.description}
+                                      </ReactMarkdown>
+                                    </div>
                                     <time className="text-xs text-dark-500">
                                       {timeLabel}
                                     </time>

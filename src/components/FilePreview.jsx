@@ -6,6 +6,7 @@ import { DocumentTextIcon, CodeBracketIcon, PencilIcon, CheckIcon, XMarkIcon, Lo
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
+import { formatDateTimeLocal } from '../utils/helpers';
 import logger from '../utils/logger';
 
 export default function FilePreview({ file, onDelete }) {
@@ -196,7 +197,7 @@ export default function FilePreview({ file, onDelete }) {
                   )}
                   {file.modified && (
                     <>
-                      Modified {new Date(file.modified).toLocaleString()}
+                      Modified {formatDateTimeLocal(file.modified)}
                       <span className="text-dark-600">•</span>
                     </>
                   )}
@@ -287,7 +288,7 @@ export default function FilePreview({ file, onDelete }) {
           <div className="flex-1">
             <h3 className="font-semibold text-dark-100">{file.name}</h3>
             <p className="text-xs text-dark-400">
-              {(content.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KB • Modified {new Date(content.modified).toLocaleString()}
+              {(content.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KB • Modified {formatDateTimeLocal(content.modified)}
             </p>
           </div>
           

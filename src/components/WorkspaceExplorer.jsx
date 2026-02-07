@@ -100,8 +100,14 @@ export default function WorkspaceExplorer() {
       // Clear all cached listings to ensure fresh data throughout the tree
       useWorkspaceStore.getState().clearAllListingCache();
       
+      // Clear all cached file contents to ensure fresh data when reopening files
+      useWorkspaceStore.getState().clearAllContentCache();
+      
       // Force tree remount to collapse all expanded folders
       setTreeKey(prev => prev + 1);
+      
+      // Clear selected file to force refetch when reselected
+      setSelectedFile(null);
       
       // Fetch root level (or current path in flat view)
       await fetchListing({ path: currentPath, recursive, force: true });
