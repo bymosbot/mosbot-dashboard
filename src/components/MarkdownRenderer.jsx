@@ -152,13 +152,34 @@ const MarkdownRenderer = ({ content, size = "sm", className = "" }) => {
     // Links
     a: ({ _node, children, ...props }) => {
       // Handle links that contain mixed content (text + code)
-      // Preserve existing components when they appear inside links
+      // Style HTTP method names consistently with code blocks
+      const processChildren = (child) => {
+        if (typeof child === 'string') {
+          // Check if the text is an HTTP method
+          const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
+          const trimmed = child.trim();
+          if (httpMethods.includes(trimmed)) {
+            // Wrap HTTP method in code-like styling
+            return (
+              <span className={`bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono leading-normal`}>
+                {trimmed}
+              </span>
+            );
+          }
+        }
+        return child;
+      };
+
+      const processedChildren = Array.isArray(children)
+        ? children.map((child, idx) => <span key={idx}>{processChildren(child)}</span>)
+        : processChildren(children);
+
       return (
         <a
-          className="text-primary-400 hover:text-primary-300 underline"
+          className="text-primary-400 hover:text-primary-300 underline inline-flex items-center gap-1"
           {...props}
         >
-          {children}
+          {processedChildren}
         </a>
       );
     },
