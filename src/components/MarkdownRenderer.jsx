@@ -72,12 +72,11 @@ const MarkdownRenderer = ({ content, size = "sm", className = "" }) => {
         if (parent.type === 'listItem') depth++;
         parent = parent.parent;
       }
-      // Use consistent margin - nested lists will inherit proper spacing
-      const baseClasses = 'list-disc list-outside ml-6';
-      const nestedClasses = depth > 0 ? 'mt-1' : '';
+      // Top-level lists use ml-6, nested lists use ml-5 for proper indentation
+      const marginClass = depth > 0 ? 'ml-5 mt-1' : 'ml-6';
       return (
         <ul
-          className={`${baseClasses} ${nestedClasses} ${textSize} text-dark-200 mb-2 space-y-1 last:mb-0`}
+          className={`list-disc list-outside ${marginClass} ${textSize} text-dark-200 mb-2 space-y-1 last:mb-0`}
           {...props}
         />
       );
@@ -91,12 +90,11 @@ const MarkdownRenderer = ({ content, size = "sm", className = "" }) => {
         if (parent.type === 'listItem') depth++;
         parent = parent.parent;
       }
-      // Use consistent margin - nested lists will inherit proper spacing
-      const baseClasses = 'list-decimal list-outside ml-6';
-      const nestedClasses = depth > 0 ? 'mt-1' : '';
+      // Top-level lists use ml-6, nested lists use ml-5 for proper indentation
+      const marginClass = depth > 0 ? 'ml-5 mt-1' : 'ml-6';
       return (
         <ol
-          className={`${baseClasses} ${nestedClasses} ${textSize} text-dark-200 mb-2 space-y-1 last:mb-0`}
+          className={`list-decimal list-outside ${marginClass} ${textSize} text-dark-200 mb-2 space-y-1 last:mb-0`}
           {...props}
         />
       );
@@ -112,7 +110,7 @@ const MarkdownRenderer = ({ content, size = "sm", className = "" }) => {
     code: ({ _node, inline, ...props }) =>
       inline ? (
         <code
-          className={`bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono`}
+          className={`inline bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono whitespace-nowrap`}
           {...props}
         />
       ) : (
@@ -150,39 +148,14 @@ const MarkdownRenderer = ({ content, size = "sm", className = "" }) => {
     ),
 
     // Links
-    a: ({ _node, children, ...props }) => {
-      // Handle links that contain mixed content (text + code)
-      // Style HTTP method names consistently with code blocks
-      const processChildren = (child) => {
-        if (typeof child === 'string') {
-          // Check if the text is an HTTP method
-          const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
-          const trimmed = child.trim();
-          if (httpMethods.includes(trimmed)) {
-            // Wrap HTTP method in code-like styling
-            return (
-              <span className={`bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono leading-normal`}>
-                {trimmed}
-              </span>
-            );
-          }
-        }
-        return child;
-      };
-
-      const processedChildren = Array.isArray(children)
-        ? children.map((child, idx) => <span key={idx}>{processChildren(child)}</span>)
-        : processChildren(children);
-
-      return (
-        <a
-          className="text-primary-400 hover:text-primary-300 underline inline-flex items-center gap-1"
-          {...props}
-        >
-          {processedChildren}
-        </a>
-      );
-    },
+    a: ({ _node, children, ...props }) => (
+      <a
+        className="text-primary-400 hover:text-primary-300 underline"
+        {...props}
+      >
+        {children}
+      </a>
+    ),
 
     // Tables
     table: ({ _node, ...props }) => (
