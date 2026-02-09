@@ -190,4 +190,33 @@ describe("MarkdownRenderer", () => {
     // The full container should also not have any backticks
     expect(container.textContent).not.toContain("`");
   });
+
+  it("handles markdown with inline code in bullet points like AGENTS.md", () => {
+    // Test the exact pattern from the screenshot: bullet point with bold text and inline code
+    const content = "- Before creating any new file, verify its placement against `docs/WORKSPACE_CONVENTIONS.md`.";
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toBeTruthy();
+    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    
+    // No backticks should be visible anywhere
+    expect(container.textContent).not.toContain("`");
+  });
+
+  it("handles the exact AGENTS.md safety rule pattern", () => {
+    // This is the exact text from the screenshot
+    const content = `- Before creating any new file, verify its placement against \`docs/WORKSPACE_CONVENTIONS.md\` .`;
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toBeTruthy();
+    
+    // Debug: log what we're actually getting
+    console.log('Code element textContent:', JSON.stringify(codeEl.textContent));
+    console.log('Full container text:', JSON.stringify(container.textContent));
+    
+    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    expect(container.textContent).not.toContain("`");
+  });
 });

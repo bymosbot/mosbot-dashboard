@@ -115,9 +115,20 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true 
     code: ({ _node, children, ...props }) => {
       // Clean up any stray backticks that might appear in the children
       // This handles edge cases where markdown parsing might include backticks
-      const cleanChildren = typeof children === 'string' 
-        ? children.replace(/^`+|`+$/g, '') 
-        : children;
+      let cleanChildren = children;
+      
+      if (typeof children === 'string') {
+        // Remove ALL backticks from string children (not just leading/trailing)
+        cleanChildren = children.replace(/`/g, '');
+      } else if (Array.isArray(children)) {
+        // Handle array of children (e.g., mixed text and elements)
+        cleanChildren = children.map(child => {
+          if (typeof child === 'string') {
+            return child.replace(/`/g, '');
+          }
+          return child;
+        });
+      }
       
       return (
         <code
