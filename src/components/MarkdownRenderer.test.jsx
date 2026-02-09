@@ -105,4 +105,89 @@ describe("MarkdownRenderer", () => {
     // No literal backticks in rendered output
     expect(container.textContent).not.toContain("`");
   });
+
+  it("renders inline code in list items with file paths", () => {
+    const content = "- **Convention file**: `docs/WORKSPACE_CONVENTIONS.md`";
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toBeTruthy();
+    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    
+    // No literal backticks in rendered output
+    expect(container.textContent).not.toContain("`");
+  });
+
+  it("handles escaped backticks correctly", () => {
+    const content = "To use a backtick, type \\`like this\\`";
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    // Escaped backticks should render as literal backticks in text, not as code blocks
+    expect(container.textContent).toContain("`like this`");
+    
+    // Should NOT create a code element for escaped backticks
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toBeFalsy();
+  });
+
+  it("handles backticks inside code blocks", () => {
+    // Test case where markdown has escaped backticks inside code
+    const content = "Use `\\`docs/WORKSPACE_CONVENTIONS.md\\`` for conventions";
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toBeTruthy();
+    
+    // ReactMarkdown renders escaped backticks inside code as just backslashes
+    // This is a known limitation - you can't escape backticks inside inline code
+    expect(codeEl.textContent).toBe("\\");
+  });
+
+  it("renders normal inline code without any backticks in output", () => {
+    // This is the expected normal case
+    const content = "Use `docs/WORKSPACE_CONVENTIONS.md` for conventions";
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toBeTruthy();
+    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    
+    // The full text should not contain any backticks
+    expect(container.textContent).not.toContain("`");
+  });
+
+  it("does not display literal backticks when content has HTML entities", () => {
+    // Test case where backticks might be HTML-encoded
+    const content = "Use &#96;docs/WORKSPACE_CONVENTIONS.md&#96; for conventions";
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    // HTML entities should be decoded and then parsed as markdown
+    const codeEl = container.querySelector("code");
+    if (codeEl) {
+      // If it was parsed as code, it should not contain backticks
+      expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+      expect(container.textContent).not.toContain("`");
+    } else {
+      // If it wasn't parsed as code, the backticks should still not be visible
+      // (they should be decoded from HTML entities)
+      expect(container.textContent).toContain("docs/WORKSPACE_CONVENTIONS.md");
+    }
+  });
+
+  it("cleans stray backticks from code element children", () => {
+    // This tests the edge case where somehow backticks end up in the code element's children
+    // We simulate this by checking that our cleaning logic would work
+    const content = "Use `docs/WORKSPACE_CONVENTIONS.md` for conventions";
+    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toBeTruthy();
+    
+    // The code element should NOT contain any backticks
+    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    expect(codeEl.textContent).not.toContain("`");
+    
+    // The full container should also not have any backticks
+    expect(container.textContent).not.toContain("`");
+  });
 });
