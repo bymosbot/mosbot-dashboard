@@ -10,7 +10,7 @@ import {
   BoltIcon,
 } from '@heroicons/react/24/outline';
 import { PRIORITY_CONFIG, TASK_PRIORITY, TASK_TYPE_CONFIG, TASK_TYPE } from '../utils/constants';
-import { formatRelativeTime, truncateText, classNames } from '../utils/helpers';
+import { formatRelativeTime, truncateText, stripMarkdown, classNames } from '../utils/helpers';
 
 const ITEM_TYPE = 'TASK';
 
@@ -114,7 +114,7 @@ export default function TaskCard({ task, onClick }) {
       {/* Description/Summary */}
       {(task.summary || task.description) && (
         <p className="text-sm text-dark-400 mb-3">
-          {truncateText(task.summary || task.description, 120)}
+          {truncateText(stripMarkdown(task.summary || task.description), 120)}
         </p>
       )}
 

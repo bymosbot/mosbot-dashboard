@@ -63,6 +63,52 @@ export const truncateText = (text, maxLength = 100) => {
   return text.substring(0, maxLength) + '...';
 };
 
+// Strip markdown formatting from text for plain text previews
+export const stripMarkdown = (text) => {
+  if (!text) return '';
+  
+  let stripped = String(text);
+  
+  // Remove code blocks (```code```)
+  stripped = stripped.replace(/```[\s\S]*?```/g, '');
+  
+  // Remove inline code (`code`)
+  stripped = stripped.replace(/`([^`]+)`/g, '$1');
+  
+  // Remove links but keep text: [text](url) -> text
+  stripped = stripped.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+  
+  // Remove images: ![alt](url) -> alt
+  stripped = stripped.replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1');
+  
+  // Remove headers (# Header -> Header)
+  stripped = stripped.replace(/^#{1,6}\s+(.+)$/gm, '$1');
+  
+  // Remove bold (**text** or __text__)
+  stripped = stripped.replace(/\*\*([^*]+)\*\*/g, '$1');
+  stripped = stripped.replace(/__([^_]+)__/g, '$1');
+  
+  // Remove italic (*text* or _text_)
+  stripped = stripped.replace(/\*([^*]+)\*/g, '$1');
+  stripped = stripped.replace(/_([^_]+)_/g, '$1');
+  
+  // Remove strikethrough (~~text~~)
+  stripped = stripped.replace(/~~([^~]+)~~/g, '$1');
+  
+  // Remove list markers (-, *, 1.)
+  stripped = stripped.replace(/^[\s]*[-*+]\s+/gm, '');
+  stripped = stripped.replace(/^[\s]*\d+\.\s+/gm, '');
+  
+  // Remove horizontal rules (---)
+  stripped = stripped.replace(/^---+$/gm, '');
+  
+  // Clean up extra whitespace
+  stripped = stripped.replace(/\n{3,}/g, '\n\n');
+  stripped = stripped.trim();
+  
+  return stripped;
+};
+
 export const generateId = () => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };

@@ -1314,19 +1314,6 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                               </span>
                             </div>
 
-                            {formData.dueDate && (
-                              <div className="border-t border-dark-700 pt-4">
-                                <label className="block text-xs font-medium text-dark-500 mb-1 uppercase tracking-wider">
-                                  Due Date
-                                </label>
-                                <p className="text-dark-100">
-                                  {new Date(
-                                    formData.dueDate
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-                            )}
-
                             {formData.assignee_id && (
                               <div className="border-t border-dark-700 pt-4">
                                 <label className="block text-xs font-medium text-dark-500 mb-1 uppercase tracking-wider">
@@ -1348,6 +1335,41 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                 {internalTask?.reporter_name || "Not set"}
                               </p>
                             </div>
+
+                            {formData.dueDate && (
+                              <div className="border-t border-dark-700 pt-4">
+                                <label className="block text-xs font-medium text-dark-500 mb-1 uppercase tracking-wider">
+                                  Due Date
+                                </label>
+                                <p className="text-dark-100">
+                                  {new Date(
+                                    formData.dueDate
+                                  ).toLocaleDateString()}
+                                </p>
+                              </div>
+                            )}
+
+                            {internalTask?.created_at && (
+                              <div className="border-t border-dark-700 pt-4">
+                                <label className="block text-xs font-medium text-dark-500 mb-1 uppercase tracking-wider">
+                                  Created At
+                                </label>
+                                <p className="text-dark-100">
+                                  {formatDateTimeLocal(internalTask.created_at)}
+                                </p>
+                              </div>
+                            )}
+
+                            {internalTask?.updated_at && (
+                              <div className="border-t border-dark-700 pt-4">
+                                <label className="block text-xs font-medium text-dark-500 mb-1 uppercase tracking-wider">
+                                  Updated At
+                                </label>
+                                <p className="text-dark-100">
+                                  {formatDateTimeLocal(internalTask.updated_at)}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
