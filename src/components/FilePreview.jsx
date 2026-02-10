@@ -172,9 +172,9 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
   // Only when file has no extension (paths like "skills" could be dirs; "PRD.md" is always a file).
   const errorStr = typeof contentError === 'string' ? contentError : '';
   const isDirAsFileError = errorStr.includes('Cannot read directory as file');
-  const pathLikelyDirectory = file && !file.name.includes('.');
+  const pathLikelyDirectory = file?.name && !file.name.includes('.');
   useEffect(() => {
-    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory && file) {
+    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory && file?.path) {
       onPathIsDirectory(file.path);
     }
   }, [isDirAsFileError, pathLikelyDirectory, onPathIsDirectory, file?.path]);

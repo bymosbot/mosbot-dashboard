@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { ClockIcon, CheckCircleIcon, QueueListIcon, PlayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
 import { getSubagents } from '../api/client';
@@ -335,7 +336,12 @@ export default function Subagents() {
                         </div>
                       )}
                       {taskKey && (
-                        <p className="text-xs text-dark-500 mt-1">{taskKey}</p>
+                        <Link
+                          to={`/task/${taskKey}`}
+                          className="text-xs text-primary-400 hover:text-primary-300 mt-1 inline-block"
+                        >
+                          {taskKey}
+                        </Link>
                       )}
                     </div>
                     {getStatusBadge(agent.status)}
