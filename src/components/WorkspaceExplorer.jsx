@@ -22,15 +22,19 @@ import DeleteConfirmModal from './DeleteConfirmModal';
 import { classNames } from '../utils/helpers';
 
 /**
- * Normalize a URL path segment to a workspace file path (leading slash, no trailing slash for files).
- * @param {string|null} pathParam - Splat from URL, e.g. "tasks/012-subagents-page/PRD.md"
- * @returns {string|null} - Normalized path like "/tasks/012-subagents-page/PRD.md" or null
+ * Normalize a URL path segment to a workspace path.
+ * - Files: "/tasks/012-subagents-page/PRD.md" (no trailing slash)
+ * - Directories: "/skills/" (trailing slash) - used when navigating via breadcrumb
+ * @param {string|null} pathParam - Splat from URL
+ * @returns {{ path: string, isDirectory: boolean }|null}
  */
 function normalizeFilePathParam(pathParam) {
   if (!pathParam || typeof pathParam !== 'string') return null;
   const trimmed = pathParam.trim();
   if (!trimmed) return null;
-  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  const isDirectory = path.endsWith('/') || path === '/';
+  return { path: path.replace(/\/+$/, '') || '/', isDirectory };
 }
 
 export default function WorkspaceExplorer({ initialFilePath = null }) {
@@ -87,30 +91,38 @@ export default function WorkspaceExplorer({ initialFilePath = null }) {
     return cache;
   }, [listings]);
   
-  // Sync URL file path to selection on mount or when navigating via link
-  const normalizedInitialPath = useMemo(
+  // Sync URL path to selection on mount or when navigating via link
+  const normalizedPath = useMemo(
     () => normalizeFilePathParam(initialFilePath),
     [initialFilePath]
   );
 
   useEffect(() => {
-    if (!normalizedInitialPath) return;
+    if (!normalizedPath) return;
 
-    const path = normalizedInitialPath;
-    const lastSlash = path.lastIndexOf('/');
-    const parentPath = lastSlash <= 0 ? '/' : path.slice(0, lastSlash);
-    const fileName = lastSlash < 0 ? path : path.slice(lastSlash + 1);
+    const { path, isDirectory } = normalizedPath;
 
-    setCurrentPath(parentPath);
-    setSelectedFile({
-      path,
-      name: fileName,
-      type: 'file'
-    });
+    if (isDirectory) {
+      // Directory view (e.g. breadcrumb click): show folder contents, no file selected
+      setCurrentPath(path);
+      setSelectedFile(null);
+      fetchListing({ path, recursive: false }).catch(() => {});
+    } else {
+      // File view: select file and show parent in tree
+      const lastSlash = path.lastIndexOf('/');
+      const parentPath = lastSlash <= 0 ? '/' : path.slice(0, lastSlash);
+      const fileName = lastSlash < 0 ? path : path.slice(lastSlash + 1);
 
-    // Fetch parent directory so it's available; ancestors will load on demand in tree view
-    fetchListing({ path: parentPath, recursive: false }).catch(() => {});
-  }, [normalizedInitialPath, setCurrentPath, setSelectedFile, fetchListing]);
+      setCurrentPath(parentPath);
+      setSelectedFile({
+        path,
+        name: fileName,
+        type: 'file'
+      });
+
+      fetchListing({ path: parentPath, recursive: false }).catch(() => {});
+    }
+  }, [normalizedPath, setCurrentPath, setSelectedFile, fetchListing]);
 
   // Initial load
   useEffect(() => {
@@ -170,7 +182,8 @@ export default function WorkspaceExplorer({ initialFilePath = null }) {
       const urlPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
       navigate(`/workspace${urlPath}`, { replace: true });
     } else if (file.type === 'directory' && viewMode === 'flat') {
-      const urlPath = file.path === '/' ? '' : file.path;
+      // Trailing slash for directories so URL sync treats as directory view
+      const urlPath = file.path === '/' ? '' : `${file.path}/`;
       navigate(`/workspace${urlPath}`, { replace: true });
     }
   };
@@ -178,7 +191,8 @@ export default function WorkspaceExplorer({ initialFilePath = null }) {
   const handleBreadcrumbClick = (path) => {
     setCurrentPath(path);
     setSelectedFile(null);
-    const urlPath = path === '/' ? '' : path;
+    // Use trailing slash for directories so URL sync treats it as directory view, not file
+    const urlPath = path === '/' ? '' : `${path}/`;
     navigate(`/workspace${urlPath}`, { replace: true });
   };
   
