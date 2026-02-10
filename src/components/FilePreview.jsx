@@ -47,7 +47,7 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
             userEmail: user?.email,
             userRole: user?.role,
           });
-        } else if (isDirAsFileError && !file.name.includes('.') && onPathIsDirectory) {
+        } else if (isDirAsFileError && file?.name && !file.name.includes('.') && onPathIsDirectory) {
           // Path is a directory (e.g. refresh on /workspace/skills); redirect to directory view
           onPathIsDirectory(file.path);
         } else {
