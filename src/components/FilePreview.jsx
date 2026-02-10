@@ -31,7 +31,7 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
   const canModify = useMemo(() => isAdmin(), [isAdmin]);
   
   useEffect(() => {
-    if (file && file.type === 'file' && !content && !contentError) {
+    if (file && file.type === 'file' && !content) {
       setIsAccessDenied(false);
       fetchFileContent({ path: file.path }).catch((error) => {
         // Check if this is a 403 Forbidden error (access denied)
@@ -47,7 +47,7 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
             userEmail: user?.email,
             userRole: user?.role,
           });
-        } else if (isDirAsFileError && onPathIsDirectory) {
+        } else if (isDirAsFileError && !file.name.includes('.') && onPathIsDirectory) {
           // Path is a directory (e.g. refresh on /workspace/skills); redirect to directory view
           onPathIsDirectory(file.path);
         } else {
@@ -63,7 +63,7 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
         }
       });
     }
-  }, [file, content, contentError, fetchFileContent, showToast, user, onPathIsDirectory]);
+  }, [file, content, fetchFileContent, showToast, user, onPathIsDirectory]);
   
   // Reset access denied flag when file changes
   useEffect(() => {
@@ -168,26 +168,27 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
     );
   }
   
-  // Redirect when contentError indicates path is a directory (e.g. refresh on /workspace/skills)
-  const isDirAsFileError = contentError?.includes('Cannot read directory as file');
+  // Redirect when contentError indicates path is a directory (e.g. refresh on /workspace/skills).
+  // Only when file has no extension (paths like "skills" could be dirs; "PRD.md" is always a file).
+  const errorStr = typeof contentError === 'string' ? contentError : '';
+  const isDirAsFileError = errorStr.includes('Cannot read directory as file');
+  const pathLikelyDirectory = file && !file.name.includes('.');
   useEffect(() => {
-    if (isDirAsFileError && onPathIsDirectory && file) {
+    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory && file) {
       onPathIsDirectory(file.path);
     }
-  }, [isDirAsFileError, onPathIsDirectory, file?.path]);
+  }, [isDirAsFileError, pathLikelyDirectory, onPathIsDirectory, file?.path]);
 
   if (contentError) {
-    if (isDirAsFileError && onPathIsDirectory) {
+    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory) {
       return null; // Redirecting; avoid flashing error UI
     }
 
     // Check if this is a 403 Forbidden error (access denied)
-    // Use the state flag set from error.response?.status === 403, with fallback to string matching
-    // for cases where contentError was set directly by the store
     const is403Error = isAccessDenied || 
-                       contentError.includes('Admin access required') || 
-                       contentError.includes('403') ||
-                       contentError.includes('Forbidden');
+                       errorStr.includes('Admin access required') || 
+                       errorStr.includes('403') ||
+                       errorStr.includes('Forbidden');
     
     if (is403Error) {
       // Show restricted view for access denied errors
