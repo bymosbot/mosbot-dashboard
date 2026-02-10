@@ -46,12 +46,12 @@ class ErrorBoundary extends Component {
                 </p>
               </div>
 
-              {import.meta.env.DEV && this.state.error && (
+              {this.state.error && (
                 <div className="mt-6 p-4 bg-dark-800 border border-dark-700 rounded-lg">
                   <p className="text-xs text-red-400 font-mono mb-2">
                     {this.state.error.toString()}
                   </p>
-                  {this.state.errorInfo && (
+                  {import.meta.env.DEV && this.state.errorInfo && (
                     <details className="text-xs text-dark-400">
                       <summary className="cursor-pointer mb-2">Stack trace</summary>
                       <pre className="overflow-auto max-h-40 text-xs">
