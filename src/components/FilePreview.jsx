@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import MarkdownRenderer from './MarkdownRenderer';
 import { DocumentTextIcon, CodeBracketIcon, PencilIcon, CheckIcon, XMarkIcon, LockClosedIcon, ClipboardIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -37,6 +37,13 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
   const isDirAsFileError = errorStr.includes('Cannot read directory as file');
   const pathLikelyDirectory = file?.name && !file.name.includes('.');
 
+  // Keep a stable ref for the onPathIsDirectory callback so it can be used
+  // inside useEffect without being a dependency (it's an inline function in
+  // the parent that gets a new reference on every render, which would otherwise
+  // cause an infinite re-render loop via the workspace store subscription).
+  const onPathIsDirectoryRef = useRef(onPathIsDirectory);
+  useEffect(() => { onPathIsDirectoryRef.current = onPathIsDirectory; });
+
   useEffect(() => {
     if (file && file.type === 'file' && !content) {
       setIsAccessDenied(false);
@@ -54,9 +61,9 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
             userEmail: user?.email,
             userRole: user?.role,
           });
-        } else if (isDirAsFileErrorLocal && file?.name && !file.name.includes('.') && onPathIsDirectory) {
+        } else if (isDirAsFileErrorLocal && file?.name && !file.name.includes('.') && onPathIsDirectoryRef.current) {
           // Path is a directory (e.g. refresh on /workspace/skills); redirect to directory view
-          onPathIsDirectory(file.path);
+          onPathIsDirectoryRef.current(file.path);
         } else {
           logger.error('Failed to load file content', error, {
             filePath: file.path,
@@ -70,7 +77,7 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
         }
       });
     }
-  }, [file, content, fetchFileContent, showToast, user, onPathIsDirectory]);
+  }, [file, content, fetchFileContent, showToast, user]);
   
   // Reset access denied flag when file changes
   useEffect(() => {
@@ -86,10 +93,10 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
   // Redirect when contentError indicates path is a directory (e.g. refresh on /workspace/skills).
   // Only when file has no extension (paths like "skills" could be dirs; "PRD.md" is always a file).
   useEffect(() => {
-    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory && file?.path) {
-      onPathIsDirectory(file.path);
+    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectoryRef.current && file?.path) {
+      onPathIsDirectoryRef.current(file.path);
     }
-  }, [isDirAsFileError, pathLikelyDirectory, onPathIsDirectory, file?.path]);
+  }, [isDirAsFileError, pathLikelyDirectory, file?.path]);
   
   const handleEdit = () => {
     if (content) {

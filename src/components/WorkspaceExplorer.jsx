@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowPathIcon, 
@@ -283,14 +283,14 @@ export default function WorkspaceExplorer({ initialFilePath = null }) {
   };
 
   // When path was opened as file but is actually a directory (e.g. refresh on /workspace/skills)
-  const handlePathIsDirectory = (path) => {
+  const handlePathIsDirectory = useCallback((path) => {
     useWorkspaceStore.getState().clearErrors();
     useWorkspaceStore.getState().clearContentCache(path);
     setCurrentPath(path);
     setSelectedFile(null);
     const urlPath = path === '/' ? '' : `${path}/`;
     navigate(`/workspace${urlPath}`, { replace: true });
-  };
+  }, [setCurrentPath, setSelectedFile, navigate]);
   
   // Drag and drop handlers
   const handleDragStart = (_node) => {
