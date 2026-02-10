@@ -30,6 +30,13 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
   const isMarkdown = file?.name.endsWith('.md');
   const canModify = useMemo(() => isAdmin(), [isAdmin]);
   
+  // Derive directory-as-file redirect values unconditionally so the useEffect
+  // below can live before any early returns (React hooks must always run in
+  // the same order).
+  const errorStr = typeof contentError === 'string' ? contentError : '';
+  const isDirAsFileError = errorStr.includes('Cannot read directory as file');
+  const pathLikelyDirectory = file?.name && !file.name.includes('.');
+
   useEffect(() => {
     if (file && file.type === 'file' && !content) {
       setIsAccessDenied(false);
@@ -37,7 +44,7 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
         // Check if this is a 403 Forbidden error (access denied)
         const is403Error = error.response?.status === 403;
         const errorMsg = error.response?.data?.error?.message || error.response?.data?.error || error.message || '';
-        const isDirAsFileError = typeof errorMsg === 'string' && errorMsg.includes('Cannot read directory as file');
+        const isDirAsFileErrorLocal = typeof errorMsg === 'string' && errorMsg.includes('Cannot read directory as file');
 
         if (is403Error) {
           logger.warn('File access denied (403)', {
@@ -47,7 +54,7 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
             userEmail: user?.email,
             userRole: user?.role,
           });
-        } else if (isDirAsFileError && file?.name && !file.name.includes('.') && onPathIsDirectory) {
+        } else if (isDirAsFileErrorLocal && file?.name && !file.name.includes('.') && onPathIsDirectory) {
           // Path is a directory (e.g. refresh on /workspace/skills); redirect to directory view
           onPathIsDirectory(file.path);
         } else {
@@ -75,6 +82,14 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
     setIsEditing(false);
     setEditedContent('');
   }, [file?.path]);
+
+  // Redirect when contentError indicates path is a directory (e.g. refresh on /workspace/skills).
+  // Only when file has no extension (paths like "skills" could be dirs; "PRD.md" is always a file).
+  useEffect(() => {
+    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory && file?.path) {
+      onPathIsDirectory(file.path);
+    }
+  }, [isDirAsFileError, pathLikelyDirectory, onPathIsDirectory, file?.path]);
   
   const handleEdit = () => {
     if (content) {
@@ -168,17 +183,6 @@ export default function FilePreview({ file, onDelete, onPathIsDirectory }) {
     );
   }
   
-  // Redirect when contentError indicates path is a directory (e.g. refresh on /workspace/skills).
-  // Only when file has no extension (paths like "skills" could be dirs; "PRD.md" is always a file).
-  const errorStr = typeof contentError === 'string' ? contentError : '';
-  const isDirAsFileError = errorStr.includes('Cannot read directory as file');
-  const pathLikelyDirectory = file?.name && !file.name.includes('.');
-  useEffect(() => {
-    if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory && file?.path) {
-      onPathIsDirectory(file.path);
-    }
-  }, [isDirAsFileError, pathLikelyDirectory, onPathIsDirectory, file?.path]);
-
   if (contentError) {
     if (isDirAsFileError && pathLikelyDirectory && onPathIsDirectory) {
       return null; // Redirecting; avoid flashing error UI
