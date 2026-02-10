@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import PropTypes from "prop-types";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -35,8 +36,9 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true 
              .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
     : '';
 
-  // Component styles based on size
-  const components = {
+  // Memoize components to prevent react-markdown from remounting all children
+  // on every render, which can trigger "Maximum update depth exceeded" errors.
+  const components = useMemo(() => ({
     // Headings
     h1: ({ node: _node, children, ...props }) => (
       <h1
@@ -221,14 +223,20 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true 
         {...props}
       />
     ),
-  };
+  }), [isExtraSmall, textSize]);
+
+  // Memoize plugin arrays to keep stable references across renders
+  const remarkPlugins = useMemo(
+    () => breaks ? [remarkGfm, remarkBreaks, remarkFrontmatter] : [remarkGfm, remarkFrontmatter],
+    [breaks]
+  );
 
   return (
     <div
       className={`prose prose-invert ${proseSize} max-w-none text-dark-200 ${className}`}
     >
       <ReactMarkdown
-        remarkPlugins={breaks ? [remarkGfm, remarkBreaks, remarkFrontmatter] : [remarkGfm, remarkFrontmatter]}
+        remarkPlugins={remarkPlugins}
         components={components}
       >
         {preprocessedContent}
