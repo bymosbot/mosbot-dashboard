@@ -1,8 +1,10 @@
 import PropTypes from "prop-types";
+import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkFrontmatter from "remark-frontmatter";
+import { getWorkspaceFileUrl, isWorkspaceFilePath } from "../utils/helpers";
 
 /**
  * MarkdownRenderer - A reusable component for rendering markdown content
@@ -117,13 +119,26 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true 
 
     // Code - in react-markdown v10+, the `inline` prop was removed.
     // Inline backticks render as bare <code>; fenced blocks render as <pre><code>.
-    // Always style <code> as inline; <pre> handles block-level wrapping.
-    code: ({ _node, ...props }) => (
-      <code
-        className={`bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono whitespace-nowrap`}
-        {...props}
-      />
-    ),
+    // Inline code that looks like a workspace file path becomes a clickable link.
+    code: ({ _node, ...props }) => {
+      const isBlockCode = _node?.parent?.type === "pre";
+      const content = typeof props.children === "string" ? props.children : String(props.children?.[0] ?? "");
+      const isFileLink = !isBlockCode && content && isWorkspaceFilePath(content);
+      const codeClass = `bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono whitespace-nowrap`;
+      if (isFileLink) {
+        return (
+          <Link
+            to={getWorkspaceFileUrl(content)}
+            className={`${codeClass} hover:text-primary-300 underline cursor-pointer`}
+          >
+            {props.children}
+          </Link>
+        );
+      }
+      return (
+        <code className={codeClass} {...props} />
+      );
+    },
     // Pre wraps fenced code blocks - provides block-level styling
     pre: ({ _node, ...props }) => (
       <pre
@@ -156,15 +171,23 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true 
       <em className="italic text-dark-200" {...props} />
     ),
 
-    // Links
-    a: ({ _node, children, ...props }) => (
-      <a
-        className="text-primary-400 hover:text-primary-300 underline"
-        {...props}
-      >
-        {children}
-      </a>
-    ),
+    // Links - workspace file paths use internal Link for SPA navigation
+    a: ({ _node, href, children, ...props }) => {
+      const isWorkspaceLink = href && isWorkspaceFilePath(href);
+      const linkClass = "text-primary-400 hover:text-primary-300 underline";
+      if (isWorkspaceLink) {
+        return (
+          <Link to={getWorkspaceFileUrl(href)} className={linkClass}>
+            {children}
+          </Link>
+        );
+      }
+      return (
+        <a className={linkClass} href={href} {...props}>
+          {children}
+        </a>
+      );
+    },
 
     // Tables
     table: ({ _node, ...props }) => (

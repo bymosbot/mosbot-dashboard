@@ -1,7 +1,10 @@
+import { useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import WorkspaceExplorer from '../components/WorkspaceExplorer';
 
 export default function Workspace() {
+  const { '*': filePathParam } = useParams();
+
   return (
     <div className="flex flex-col h-full">
       <Header 
@@ -10,7 +13,7 @@ export default function Workspace() {
       />
       
       <div className="flex-1 flex flex-col p-3 md:p-6 overflow-hidden">
-        <WorkspaceExplorer />
+        <WorkspaceExplorer initialFilePath={filePathParam || null} />
       </div>
     </div>
   );

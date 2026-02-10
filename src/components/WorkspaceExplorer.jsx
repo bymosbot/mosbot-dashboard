@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   ArrowPathIcon, 
   Squares2X2Icon,
@@ -20,7 +21,20 @@ import RenameModal from './RenameModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { classNames } from '../utils/helpers';
 
-export default function WorkspaceExplorer() {
+/**
+ * Normalize a URL path segment to a workspace file path (leading slash, no trailing slash for files).
+ * @param {string|null} pathParam - Splat from URL, e.g. "tasks/012-subagents-page/PRD.md"
+ * @returns {string|null} - Normalized path like "/tasks/012-subagents-page/PRD.md" or null
+ */
+function normalizeFilePathParam(pathParam) {
+  if (!pathParam || typeof pathParam !== 'string') return null;
+  const trimmed = pathParam.trim();
+  if (!trimmed) return null;
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+export default function WorkspaceExplorer({ initialFilePath = null }) {
+  const navigate = useNavigate();
   const {
     listings,
     isLoadingListing,
@@ -73,6 +87,31 @@ export default function WorkspaceExplorer() {
     return cache;
   }, [listings]);
   
+  // Sync URL file path to selection on mount or when navigating via link
+  const normalizedInitialPath = useMemo(
+    () => normalizeFilePathParam(initialFilePath),
+    [initialFilePath]
+  );
+
+  useEffect(() => {
+    if (!normalizedInitialPath) return;
+
+    const path = normalizedInitialPath;
+    const lastSlash = path.lastIndexOf('/');
+    const parentPath = lastSlash <= 0 ? '/' : path.slice(0, lastSlash);
+    const fileName = lastSlash < 0 ? path : path.slice(lastSlash + 1);
+
+    setCurrentPath(parentPath);
+    setSelectedFile({
+      path,
+      name: fileName,
+      type: 'file'
+    });
+
+    // Fetch parent directory so it's available; ancestors will load on demand in tree view
+    fetchListing({ path: parentPath, recursive: false }).catch(() => {});
+  }, [normalizedInitialPath, setCurrentPath, setSelectedFile, fetchListing]);
+
   // Initial load
   useEffect(() => {
     // Avoid infinite retry loops: if this path/view already failed, wait for user action (refresh).
@@ -108,6 +147,7 @@ export default function WorkspaceExplorer() {
       
       // Clear selected file to force refetch when reselected
       setSelectedFile(null);
+      navigate('/workspace', { replace: true });
       
       // Fetch root level (or current path in flat view)
       await fetchListing({ path: currentPath, recursive, force: true });
@@ -125,16 +165,27 @@ export default function WorkspaceExplorer() {
     if (file.type === 'directory' && viewMode === 'flat') {
       setCurrentPath(file.path);
     }
+    // Update URL so the link is shareable
+    if (file.type === 'file') {
+      const urlPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+      navigate(`/workspace${urlPath}`, { replace: true });
+    } else if (file.type === 'directory' && viewMode === 'flat') {
+      const urlPath = file.path === '/' ? '' : file.path;
+      navigate(`/workspace${urlPath}`, { replace: true });
+    }
   };
   
   const handleBreadcrumbClick = (path) => {
     setCurrentPath(path);
     setSelectedFile(null);
+    const urlPath = path === '/' ? '' : path;
+    navigate(`/workspace${urlPath}`, { replace: true });
   };
   
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
     setSelectedFile(null);
+    navigate('/workspace', { replace: true });
   };
   
   // Fetch children for a folder (on-demand loading for tree view)
@@ -211,6 +262,10 @@ export default function WorkspaceExplorer() {
   
   const handleView = (file) => {
     setSelectedFile(file);
+    if (file.type === 'file') {
+      const urlPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+      navigate(`/workspace${urlPath}`, { replace: true });
+    }
   };
   
   // Drag and drop handlers

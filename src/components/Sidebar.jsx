@@ -74,7 +74,9 @@ export default function Sidebar({ onCloseMobile }) {
             // For items without subpages, highlight if on the route
             const isActive = hasSubpages 
               ? location.pathname === item.href
-              : location.pathname === item.href;
+              : item.href === '/workspace'
+                ? location.pathname.startsWith('/workspace')
+                : location.pathname === item.href;
             const isExpanded = expandedItems[item.name] || (item.subpages && item.subpages.some(sub => location.pathname === sub.href));
 
             return (

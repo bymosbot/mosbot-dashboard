@@ -76,10 +76,10 @@ export const stripMarkdown = (text) => {
   stripped = stripped.replace(/`([^`]+)`/g, '$1');
   
   // Remove links but keep text: [text](url) -> text
-  stripped = stripped.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+  stripped = stripped.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
   
   // Remove images: ![alt](url) -> alt
-  stripped = stripped.replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1');
+  stripped = stripped.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1');
   
   // Remove headers (# Header -> Header)
   stripped = stripped.replace(/^#{1,6}\s+(.+)$/gm, '$1');
@@ -115,4 +115,40 @@ export const generateId = () => {
 
 export const classNames = (...classes) => {
   return classes.filter(Boolean).join(' ');
+};
+
+/**
+ * Build a shareable URL for viewing a workspace file.
+ * Use with React Router's Link or for copying to clipboard.
+ *
+ * @param {string} filePath - Full workspace path, e.g. "/tasks/012-subagents-page/PRD.md"
+ * @returns {string} - Route path like "/workspace/tasks/012-subagents-page/PRD.md"
+ *
+ * @example
+ * <Link to={getWorkspaceFileUrl('/tasks/012-subagents-page/PRD.md')}>View PRD</Link>
+ */
+export const getWorkspaceFileUrl = (filePath) => {
+  if (!filePath || typeof filePath !== 'string') return '/workspace';
+  const normalized = filePath.trim().replace(/\/+/g, '/');
+  const withSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
+  return `/workspace${withSlash}`;
+};
+
+/**
+ * Check if a string looks like a workspace file path (for auto-linking in markdown).
+ * Matches paths like tasks/012-subagents-page/PRD.md, docs/README.md, /docs/file.md
+ *
+ * @param {string} str - String to check (e.g. from inline code or link href)
+ * @returns {boolean}
+ */
+export const isWorkspaceFilePath = (str) => {
+  if (!str || typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  if (!trimmed || trimmed.includes('..')) return false;
+  // Exclude URLs, anchors, mailto
+  if (/^(https?:|mailto:|#)/i.test(trimmed)) return false;
+  // Match path-like strings: must have file extension or multi-segment path
+  // e.g. tasks/012/PRD.md, docs/README.md, tasks/012-subagents-page/PRD
+  return /^\/?[\w./-]+\.(md|mdx|txt|json|yaml|yml|js|jsx|ts|tsx|css|html)$/i.test(trimmed) ||
+    /^\/?[\w-]+\/[\w./-]+$/.test(trimmed);
 };

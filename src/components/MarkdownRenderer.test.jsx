@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import MarkdownRenderer from "./MarkdownRenderer";
+
+const renderWithRouter = (ui) =>
+  render(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe("MarkdownRenderer", () => {
   it("renders simple markdown content", () => {
@@ -106,13 +110,13 @@ describe("MarkdownRenderer", () => {
     expect(container.textContent).not.toContain("`");
   });
 
-  it("renders inline code in list items with file paths", () => {
+  it("renders inline code in list items with file paths as workspace links", () => {
     const content = "- **Convention file**: `docs/WORKSPACE_CONVENTIONS.md`";
-    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    const { container } = renderWithRouter(<MarkdownRenderer content={content} size="sm" />);
     
-    const codeEl = container.querySelector("code");
-    expect(codeEl).toBeTruthy();
-    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    const link = container.querySelector('a[href="/workspace/docs/WORKSPACE_CONVENTIONS.md"]');
+    expect(link).toBeTruthy();
+    expect(link.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
     
     // No literal backticks in rendered output
     expect(container.textContent).not.toContain("`");
@@ -144,13 +148,13 @@ describe("MarkdownRenderer", () => {
   });
 
   it("renders normal inline code without any backticks in output", () => {
-    // This is the expected normal case
+    // This is the expected normal case - file paths become workspace links
     const content = "Use `docs/WORKSPACE_CONVENTIONS.md` for conventions";
-    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    const { container } = renderWithRouter(<MarkdownRenderer content={content} size="sm" />);
     
-    const codeEl = container.querySelector("code");
-    expect(codeEl).toBeTruthy();
-    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    const link = container.querySelector('a[href="/workspace/docs/WORKSPACE_CONVENTIONS.md"]');
+    expect(link).toBeTruthy();
+    expect(link.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
     
     // The full text should not contain any backticks
     expect(container.textContent).not.toContain("`");
@@ -159,7 +163,7 @@ describe("MarkdownRenderer", () => {
   it("does not display literal backticks when content has HTML entities", () => {
     // Test case where backticks might be HTML-encoded
     const content = "Use &#96;docs/WORKSPACE_CONVENTIONS.md&#96; for conventions";
-    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    const { container } = renderWithRouter(<MarkdownRenderer content={content} size="sm" />);
     
     // HTML entities should be decoded and then parsed as markdown
     const codeEl = container.querySelector("code");
@@ -175,17 +179,14 @@ describe("MarkdownRenderer", () => {
   });
 
   it("cleans stray backticks from code element children", () => {
-    // This tests the edge case where somehow backticks end up in the code element's children
-    // We simulate this by checking that our cleaning logic would work
+    // File paths in backticks become workspace links
     const content = "Use `docs/WORKSPACE_CONVENTIONS.md` for conventions";
-    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    const { container } = renderWithRouter(<MarkdownRenderer content={content} size="sm" />);
     
-    const codeEl = container.querySelector("code");
-    expect(codeEl).toBeTruthy();
-    
-    // The code element should NOT contain any backticks
-    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
-    expect(codeEl.textContent).not.toContain("`");
+    const link = container.querySelector('a[href="/workspace/docs/WORKSPACE_CONVENTIONS.md"]');
+    expect(link).toBeTruthy();
+    expect(link.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    expect(link.textContent).not.toContain("`");
     
     // The full container should also not have any backticks
     expect(container.textContent).not.toContain("`");
@@ -194,11 +195,11 @@ describe("MarkdownRenderer", () => {
   it("handles markdown with inline code in bullet points like AGENTS.md", () => {
     // Test the exact pattern from the screenshot: bullet point with bold text and inline code
     const content = "- Before creating any new file, verify its placement against `docs/WORKSPACE_CONVENTIONS.md`.";
-    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    const { container } = renderWithRouter(<MarkdownRenderer content={content} size="sm" />);
     
-    const codeEl = container.querySelector("code");
-    expect(codeEl).toBeTruthy();
-    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    const link = container.querySelector('a[href="/workspace/docs/WORKSPACE_CONVENTIONS.md"]');
+    expect(link).toBeTruthy();
+    expect(link.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
     
     // No backticks should be visible anywhere
     expect(container.textContent).not.toContain("`");
@@ -207,12 +208,11 @@ describe("MarkdownRenderer", () => {
   it("handles the exact AGENTS.md safety rule pattern", () => {
     // This is the exact text from the screenshot
     const content = `- Before creating any new file, verify its placement against \`docs/WORKSPACE_CONVENTIONS.md\` .`;
-    const { container } = render(<MarkdownRenderer content={content} size="sm" />);
+    const { container } = renderWithRouter(<MarkdownRenderer content={content} size="sm" />);
     
-    const codeEl = container.querySelector("code");
-    expect(codeEl).toBeTruthy();
-
-    expect(codeEl.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
+    const link = container.querySelector('a[href="/workspace/docs/WORKSPACE_CONVENTIONS.md"]');
+    expect(link).toBeTruthy();
+    expect(link.textContent).toBe("docs/WORKSPACE_CONVENTIONS.md");
     expect(container.textContent).not.toContain("`");
   });
 
