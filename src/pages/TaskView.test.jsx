@@ -15,9 +15,18 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-// Mock stores
+// Mock stores - useTaskStore needs both hook return and getState() for direct store access
+// vi.hoisted ensures these exist before vi.mock runs
+const { mockFetchTaskById, mockTasks, mockUseTaskStore } = vi.hoisted(() => {
+  const mockFetchTaskById = vi.fn();
+  const mockTasks = [];
+  const mockUseTaskStore = Object.assign(vi.fn(), {
+    getState: () => ({ tasks: mockTasks }),
+  });
+  return { mockFetchTaskById, mockTasks, mockUseTaskStore };
+});
 vi.mock('../stores/taskStore', () => ({
-  useTaskStore: vi.fn(),
+  useTaskStore: mockUseTaskStore,
 }));
 
 // Mock logger
@@ -41,12 +50,11 @@ vi.mock('../components/TaskModal', () => ({
 }));
 
 describe('TaskView', () => {
-  const mockFetchTaskById = vi.fn();
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockNavigate.mockClear();
-    useTaskStore.mockReturnValue({
+    mockTasks.length = 0;
+    mockUseTaskStore.mockReturnValue({
       fetchTaskById: mockFetchTaskById,
       tasks: [],
       isLoading: false,
@@ -56,7 +64,8 @@ describe('TaskView', () => {
 
   it('loads task from store when available', async () => {
     const existingTask = { id: '1', title: 'Existing Task', status: 'TODO' };
-    useTaskStore.mockReturnValue({
+    mockTasks.push(existingTask);
+    mockUseTaskStore.mockReturnValue({
       fetchTaskById: mockFetchTaskById,
       tasks: [existingTask],
       isLoading: false,
@@ -152,7 +161,8 @@ describe('TaskView', () => {
     const user = userEvent.setup({ delay: null });
 
     const existingTask = { id: '1', title: 'Task', status: 'TODO' };
-    useTaskStore.mockReturnValue({
+    mockTasks.push(existingTask);
+    mockUseTaskStore.mockReturnValue({
       fetchTaskById: mockFetchTaskById,
       tasks: [existingTask],
       isLoading: false,
