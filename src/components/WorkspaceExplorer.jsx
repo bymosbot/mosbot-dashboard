@@ -6,6 +6,7 @@ import {
   QueueListIcon,
   MagnifyingGlassIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
   DocumentPlusIcon,
   FolderPlusIcon
 } from '@heroicons/react/24/outline';
@@ -196,6 +197,13 @@ export default function WorkspaceExplorer({ initialFilePath = null }) {
     navigate(`/workspace${urlPath}`, { replace: true });
   };
   
+  const handleGoUpOneLevel = () => {
+    if (currentPath === '/') return;
+    const lastSlash = currentPath.lastIndexOf('/');
+    const parentPath = lastSlash <= 0 ? '/' : currentPath.slice(0, lastSlash);
+    handleBreadcrumbClick(parentPath);
+  };
+  
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
     setSelectedFile(null);
@@ -379,6 +387,16 @@ export default function WorkspaceExplorer({ initialFilePath = null }) {
         <div className="flex items-center justify-between gap-4">
           {/* Left: Breadcrumbs for navigation (both modes) */}
           <div className="flex items-center gap-2 min-w-0">
+            {/* Go up one level button */}
+            {currentPath !== '/' && (
+              <button
+                onClick={handleGoUpOneLevel}
+                className="p-1.5 text-dark-400 hover:text-dark-200 hover:bg-dark-800 rounded transition-colors flex-shrink-0"
+                title="Go up one level"
+              >
+                <ChevronUpIcon className="w-4 h-4" />
+              </button>
+            )}
             <nav className="flex items-center gap-1 text-sm">
               {breadcrumbs.map((crumb, index) => (
                 <div key={crumb.path} className="flex items-center gap-1">
