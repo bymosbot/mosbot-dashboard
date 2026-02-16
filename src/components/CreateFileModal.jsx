@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useToastStore } from '../stores/toastStore';
 import { validateFilePath, buildFullPath } from '../utils/pathValidation';
 
-export default function CreateFileModal({ isOpen, onClose, currentPath }) {
+export default function CreateFileModal({ isOpen, onClose, currentPath, agentId = 'coo' }) {
   const [fileName, setFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createFile, listings, fetchListing } = useWorkspaceStore();
@@ -42,13 +42,13 @@ export default function CreateFileModal({ isOpen, onClose, currentPath }) {
         
         // Try to get listing for parent directory
         const parentPath = checkPath.substring(0, checkPath.lastIndexOf('/')) || '/';
-        const cacheKey = `${parentPath}:false`;
+        const cacheKey = `${agentId}:${parentPath}:false`;
         let listing = listings[cacheKey];
         
         // If not in cache, fetch it
         if (!listing) {
           try {
-            const result = await fetchListing({ path: parentPath, recursive: false });
+            const result = await fetchListing({ path: parentPath, recursive: false, agentId });
             listing = result;
           } catch (error) {
             // If we can't fetch the listing, the parent doesn't exist, which is fine
@@ -76,11 +76,11 @@ export default function CreateFileModal({ isOpen, onClose, currentPath }) {
         }
       }
       
-      await createFile({ path: filePath, content: '' });
+      await createFile({ path: filePath, content: '', agentId });
       
       // Refetch parent directory listing to update the UI
       const parentPath = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
-      await fetchListing({ path: parentPath, recursive: false, force: true });
+      await fetchListing({ path: parentPath, recursive: false, force: true, agentId });
       
       // Extract just the filename for the success message
       const displayName = trimmedName.split('/').filter(Boolean).pop() || trimmedName;

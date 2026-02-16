@@ -3,7 +3,7 @@ import { XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useToastStore } from '../stores/toastStore';
 
-export default function DeleteConfirmModal({ isOpen, onClose, file }) {
+export default function DeleteConfirmModal({ isOpen, onClose, file, agentId = 'coo' }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { deleteFile, fetchListing } = useWorkspaceStore();
   const { showToast } = useToastStore();
@@ -14,11 +14,11 @@ export default function DeleteConfirmModal({ isOpen, onClose, file }) {
     setIsSubmitting(true);
     
     try {
-      await deleteFile({ path: file.path });
+      await deleteFile({ path: file.path, agentId });
       
       // Refetch parent directory listing to update the UI
       const parentPath = file.path.substring(0, file.path.lastIndexOf('/')) || '/';
-      await fetchListing({ path: parentPath, recursive: false, force: true });
+      await fetchListing({ path: parentPath, recursive: false, force: true, agentId });
       
       showToast(
         `${file.type === 'file' ? 'File' : 'Folder'} "${file.name}" deleted successfully`, 

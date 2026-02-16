@@ -298,7 +298,6 @@ function CronJobRow({ job }) {
 export default function CronJobList({ jobs, isLoading }) {
   return (
     <div className="bg-dark-900 border border-dark-800 rounded-lg p-6">
-      <h3 className="text-lg font-semibold text-dark-100 mb-5">Cron Jobs</h3>
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <div className="inline-block w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>

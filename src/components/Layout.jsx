@@ -4,6 +4,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import Sidebar from './Sidebar';
 import MobileNavContext from './MobileNavContext';
+import GlobalSessionPoller from './GlobalSessionPoller';
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -12,6 +13,9 @@ export default function Layout({ children }) {
 
   return (
     <MobileNavContext.Provider value={() => setMobileNavOpen(true)}>
+      {/* Global session polling - runs in background on all pages */}
+      {!isLoginPage && <GlobalSessionPoller />}
+      
       <div className="flex h-screen overflow-hidden bg-dark-950">
         {/* Mobile Navigation Drawer */}
         {!isLoginPage && (

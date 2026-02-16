@@ -2,6 +2,17 @@ import { create } from 'zustand';
 import { getAgents } from '../api/client';
 import logger from '../utils/logger';
 
+// Archived workspace agent - temporary access to archived files
+const archivedAgent = {
+  id: 'archived',
+  name: 'Archived',
+  label: 'Archived (Old Main)',
+  description: 'Archived workspace files from previous iteration',
+  workspaceRootPath: '/_archived_workspace_main',
+  icon: '📦',
+  isDefault: false
+};
+
 // Fallback agents if API fails or returns empty
 const fallbackAgents = [
   {
@@ -11,7 +22,7 @@ const fallbackAgents = [
     description: 'Chief Operating Officer and Task Orchestrator',
     workspaceRootPath: '/workspace-coo',
     icon: '📊',
-    isDefault: true
+    isDefault: false
   },
   {
     id: 'cto',
@@ -40,6 +51,7 @@ const fallbackAgents = [
     icon: '💡',
     isDefault: false
   },
+  archivedAgent,
 ];
 
 export const useAgentStore = create((set, get) => ({
@@ -64,12 +76,18 @@ export const useAgentStore = create((set, get) => ({
       
       // Transform workspace paths to workspaceRootPath format for consistency
       // Each agent's workspaceRootPath points to their specific workspace directory
-      const agents = agentsData.map(agent => ({
+      let agents = agentsData.map(agent => ({
         ...agent,
         workspaceRootPath: agent.workspace 
           ? `/workspace-${agent.id}` 
           : `/workspace-${agent.id}`,
       }));
+
+      // Filter out API version if present, use our constant
+      agents = agents.filter(a => a.id !== 'archived');
+      
+      // Append Archived at the end
+      agents = [...agents, archivedAgent];
 
       set({ 
         agents: agents.length > 0 ? agents : fallbackAgents, 

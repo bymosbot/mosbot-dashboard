@@ -2,7 +2,7 @@ import { ClockIcon, CpuChipIcon, ChatBubbleLeftIcon } from "@heroicons/react/24/
 import { stripMarkdown } from "../utils/helpers";
 import { useAgentStore } from "../stores/agentStore";
 
-export default function SessionRow({ session }) {
+export default function SessionRow({ session, onClick }) {
   const getAgentById = useAgentStore((state) => state.getAgentById);
   const agent = session.agent ? getAgentById(session.agent) : null;
   const getStatusColor = (status) => {
@@ -79,7 +79,10 @@ export default function SessionRow({ session }) {
   };
 
   return (
-    <div className="p-5 bg-dark-800 border border-dark-700 rounded-lg hover:border-dark-600 transition-colors">
+    <div 
+      className="p-5 bg-dark-800 border border-dark-700 rounded-lg hover:border-dark-600 transition-colors cursor-pointer"
+      onClick={() => onClick?.(session)}
+    >
       {/* Top row: label, agent, model, status */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 flex-1 min-w-0">

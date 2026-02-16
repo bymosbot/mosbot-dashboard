@@ -138,7 +138,7 @@ describe('DeleteConfirmModal', () => {
     await user.click(deleteButton);
 
     await waitFor(() => {
-      expect(mockDeleteFile).toHaveBeenCalledWith({ path: '/test.txt' });
+      expect(mockDeleteFile).toHaveBeenCalledWith(expect.objectContaining({ path: '/test.txt' }));
       expect(mockFetchListing).toHaveBeenCalled();
       expect(mockShowToast).toHaveBeenCalledWith(
         'File "test.txt" deleted successfully',
@@ -162,7 +162,7 @@ describe('DeleteConfirmModal', () => {
     await user.click(deleteButton);
 
     await waitFor(() => {
-      expect(mockDeleteFile).toHaveBeenCalledWith({ path: '/folder' });
+      expect(mockDeleteFile).toHaveBeenCalledWith(expect.objectContaining({ path: '/folder' }));
       expect(mockFetchListing).toHaveBeenCalled();
       expect(mockShowToast).toHaveBeenCalledWith(
         'Folder "folder" deleted successfully',

@@ -15,6 +15,8 @@ import {
   RectangleGroupIcon,
   ChartPieIcon,
   DocumentTextIcon,
+  CalendarDaysIcon,
+  CubeIcon,
 } from '@heroicons/react/24/outline';
 import { classNames } from '../utils/helpers';
 import { useAuthStore } from '../stores/authStore';
@@ -42,11 +44,13 @@ export default function Sidebar({ onCloseMobile }) {
     { name: 'Kanban', href: '/tasks/kanban', icon: RectangleGroupIcon },
     { name: 'Org Chart', href: '/tasks/org-chart', icon: ChartBarIcon },
     { name: 'Subagents', href: '/subagents', icon: CpuChipIcon },
+    { name: 'Scheduler', href: '/scheduler', icon: CalendarDaysIcon },
     { name: 'Workspaces', href: `/workspaces/${getDefaultAgent()?.id || 'coo'}`, icon: FolderIcon },
     { name: 'Docs', href: '/docs', icon: DocumentTextIcon },
     { name: 'Log', href: '/log', icon: ClipboardDocumentListIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon, subpages: [
       { name: 'Users', href: '/settings/users', icon: UserIcon },
+      { name: 'Model Fleet', href: '/settings/model-fleet', icon: CubeIcon },
     ]},
     { name: 'Archived', href: '/archived', icon: ArchiveBoxIcon },
   ];
@@ -86,10 +90,10 @@ export default function Sidebar({ onCloseMobile }) {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navigation.map((item) => {
             const hasSubpages = item.subpages && item.subpages.length > 0;
-            // For items with subpages, highlight parent if any subpage is active
+            // For items with subpages, highlight parent only when on the exact parent route (not a subpage)
             // For items without subpages, highlight if on the route
             const isActive = hasSubpages 
-              ? location.pathname.startsWith('/settings')
+              ? location.pathname === item.href
               : item.href === '/workspaces'
                 ? location.pathname.startsWith('/workspaces')
                 : item.href === '/docs'

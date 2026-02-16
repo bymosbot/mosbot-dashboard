@@ -105,13 +105,13 @@ describe('RenameModal', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockFetchFileContent).toHaveBeenCalledWith({ path: '/old.txt' });
-      expect(mockCreateFile).toHaveBeenCalledWith({
+      expect(mockFetchFileContent).toHaveBeenCalledWith(expect.objectContaining({ path: '/old.txt' }));
+      expect(mockCreateFile).toHaveBeenCalledWith(expect.objectContaining({
         path: '/new.txt',
         content: 'file content',
         encoding: 'utf8',
-      });
-      expect(mockDeleteFile).toHaveBeenCalledWith({ path: '/old.txt' });
+      }));
+      expect(mockDeleteFile).toHaveBeenCalledWith(expect.objectContaining({ path: '/old.txt' }));
       expect(mockFetchListing).toHaveBeenCalled();
       expect(mockShowToast).toHaveBeenCalledWith('File renamed to "new.txt"', 'success');
       expect(mockOnClose).toHaveBeenCalled();
@@ -272,11 +272,11 @@ describe('RenameModal', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockCreateFile).toHaveBeenCalledWith({
+      expect(mockCreateFile).toHaveBeenCalledWith(expect.objectContaining({
         path: '/documents/sub/newname.txt',
         content: 'content',
         encoding: 'utf8',
-      });
+      }));
     });
   });
 });

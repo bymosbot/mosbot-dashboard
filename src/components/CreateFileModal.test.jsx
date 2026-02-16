@@ -95,10 +95,10 @@ describe('CreateFileModal', () => {
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
-    expect(mockCreateFile).toHaveBeenCalledWith({
+    expect(mockCreateFile).toHaveBeenCalledWith(expect.objectContaining({
       path: '/newfile.txt',
       content: '',
-    });
+    }));
     expect(mockShowToast).toHaveBeenCalledWith(
       'File "newfile.txt" created successfully',
       'success'
@@ -120,10 +120,10 @@ describe('CreateFileModal', () => {
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
-    expect(mockCreateFile).toHaveBeenCalledWith({
+    expect(mockCreateFile).toHaveBeenCalledWith(expect.objectContaining({
       path: '/documents/document.txt',
       content: '',
-    });
+    }));
   });
 
   it('shows error when file name is empty', async () => {
@@ -186,10 +186,10 @@ describe('CreateFileModal', () => {
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
-    expect(mockCreateFile).toHaveBeenCalledWith({
+    expect(mockCreateFile).toHaveBeenCalledWith(expect.objectContaining({
       path: '/path/to/file.txt',
       content: '',
-    });
+    }));
   });
 
   it('shows error for path traversal attempts with ..', async () => {
@@ -311,9 +311,9 @@ describe('CreateFileModal', () => {
     const submitButton = screen.getByText('Create File');
     await user.click(submitButton);
 
-    expect(mockCreateFile).toHaveBeenCalledWith({
+    expect(mockCreateFile).toHaveBeenCalledWith(expect.objectContaining({
       path: '/test.txt',
       content: '',
-    });
+    }));
   });
 });

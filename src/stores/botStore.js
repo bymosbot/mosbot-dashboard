@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../api/client';
+import { getOpenClawSessions } from '../api/client';
 import logger from '../utils/logger';
 
 // Mood definitions with labels and styling
@@ -37,6 +38,11 @@ export const MOODS = {
 const FRUSTRATION_TIMEOUT = 5000; // Return to calm after 5 seconds
 const EXCITEMENT_TIMEOUT = 3000; // Return to calm after 3 seconds
 
+// Session polling interval: 30 seconds
+// Each poll triggers ~6 requests to the OpenClaw gateway (1 config read + 5 agent queries
+// via /tools/invoke). A shorter interval risks flooding the gateway and starving cron jobs.
+const SESSION_POLLING_INTERVAL = 30000;
+
 export const useBotStore = create((set, get) => ({
   // Request tracking
   inflightRequests: 0,
@@ -46,8 +52,12 @@ export const useBotStore = create((set, get) => ({
   healthCheckInterval: null, // Interval ID for health checks
   connectionStableTimer: null, // Timer to stabilize connection state changes
   
-  // OpenClaw session status (fed from TaskManagerOverview polling)
+  // OpenClaw session data (single source of truth, polled globally)
+  sessions: [],
+  sessionsLoaded: false,
+  sessionsError: null,
   sessionCounts: { running: 0, active: 0, idle: 0, total: 0 },
+  sessionPollingInterval: null, // Interval ID for session polling
   
   // Mood state (activity-driven only)
   currentMood: MOODS.CALM,
@@ -148,8 +158,60 @@ export const useBotStore = create((set, get) => ({
   setConnected: (connected) => set({ isConnected: connected }),
   
   // Update session counts from OpenClaw Gateway data
-  // Called by TaskManagerOverview when session data is fetched
   setSessionCounts: (counts) => set({ sessionCounts: counts }),
+  
+  // Fetch sessions from OpenClaw Gateway and update store
+  // This is the single source of truth for session data across the app
+  fetchSessions: async () => {
+    try {
+      const data = await getOpenClawSessions();
+      const sessions = data || [];
+      
+      set({
+        sessions,
+        sessionsLoaded: true,
+        sessionsError: null,
+        sessionCounts: {
+          running: sessions.filter(s => s.status === 'running').length,
+          active: sessions.filter(s => s.status === 'active').length,
+          idle: sessions.filter(s => s.status === 'idle').length,
+          total: sessions.length,
+        },
+      });
+      
+      return sessions;
+    } catch (err) {
+      logger.error('Failed to fetch sessions', err);
+      set({ sessionsError: err.message });
+      return get().sessions; // Return stale data on error
+    }
+  },
+  
+  // Start global session polling (called once from Layout)
+  startSessionPolling: () => {
+    const state = get();
+    
+    // Don't start if already running
+    if (state.sessionPollingInterval) return;
+    
+    // Initial fetch
+    get().fetchSessions();
+    
+    const interval = setInterval(() => {
+      get().fetchSessions();
+    }, SESSION_POLLING_INTERVAL);
+    
+    set({ sessionPollingInterval: interval });
+  },
+  
+  // Stop global session polling
+  stopSessionPolling: () => {
+    const state = get();
+    if (state.sessionPollingInterval) {
+      clearInterval(state.sessionPollingInterval);
+      set({ sessionPollingInterval: null });
+    }
+  },
   
   // Check OpenClaw workspace service health
   checkOpenClawHealth: async () => {
@@ -217,7 +279,7 @@ export const useBotStore = create((set, get) => ({
     }
   },
   
-  // Cleanup function to clear all mood timers and health checks
+  // Cleanup function to clear all mood timers, health checks, and session polling
   // Call this when components unmount or store needs to be reset
   cleanupTimers: () => {
     const state = get();
@@ -233,7 +295,10 @@ export const useBotStore = create((set, get) => ({
     if (state.connectionStableTimer) {
       clearTimeout(state.connectionStableTimer);
     }
-    set({ moodTimers: {}, healthCheckInterval: null, connectionStableTimer: null });
+    if (state.sessionPollingInterval) {
+      clearInterval(state.sessionPollingInterval);
+    }
+    set({ moodTimers: {}, healthCheckInterval: null, connectionStableTimer: null, sessionPollingInterval: null });
   },
   
   // Computed properties

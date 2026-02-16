@@ -6,6 +6,19 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkFrontmatter from "remark-frontmatter";
 import { getWorkspaceFileUrl, isWorkspaceFilePath } from "../utils/helpers";
+import SmartContentBlock from "./SmartContentBlock";
+import JsonBlock from "./JsonBlock";
+import TerminalBlock from "./TerminalBlock";
+
+/**
+ * Extracts plain text from React children (for paragraph content).
+ */
+function getTextFromChildren(children) {
+  if (typeof children === "string") return children;
+  if (Array.isArray(children)) return children.map(getTextFromChildren).join("");
+  if (children?.props?.children != null) return getTextFromChildren(children.props.children);
+  return "";
+}
 
 /**
  * MarkdownRenderer - A reusable component for rendering markdown content
@@ -40,45 +53,69 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true,
   // Memoize components to prevent react-markdown from remounting all children
   // on every render, which can trigger "Maximum update depth exceeded" errors.
   const components = useMemo(() => ({
-    // Headings
-    h1: ({ node: _node, children, ...props }) => (
-      <h1
-        className={`font-bold text-dark-100 ${
-          isExtraSmall ? "text-base mt-3 mb-1.5" : "text-2xl mt-6 mb-3"
-        }`}
-        {...props}
-      >
-        {children}
-      </h1>
-    ),
-    h2: ({ node: _node, children, ...props }) => (
-      <h2
-        className={`font-semibold text-dark-100 ${
-          isExtraSmall ? "text-sm mt-3 mb-1" : "text-xl mt-5 mb-2"
-        }`}
-        {...props}
-      >
-        {children}
-      </h2>
-    ),
-    h3: ({ node: _node, children, ...props }) => (
-      <h3
-        className={`font-semibold text-dark-100 ${
-          isExtraSmall ? "text-xs mt-2 mb-1" : "text-lg mt-4 mb-2"
-        }`}
-        {...props}
-      >
-        {children}
-      </h3>
-    ),
+    // Headings - check for JSON/terminal content first
+    h1: ({ node: _node, children, ...props }) => {
+      const text = getTextFromChildren(children)?.trim() ?? "";
+      const h1El = (
+        <h1
+          className={`font-bold text-dark-100 ${
+            isExtraSmall ? "text-base mt-3 mb-1.5" : "text-2xl mt-6 mb-3"
+          }`}
+          {...props}
+        >
+          {children}
+        </h1>
+      );
+      if (!text || text.length > 50000) return h1El;
+      return <SmartContentBlock content={text} fallback={h1El} />;
+    },
+    h2: ({ node: _node, children, ...props }) => {
+      const text = getTextFromChildren(children)?.trim() ?? "";
+      const h2El = (
+        <h2
+          className={`font-semibold text-dark-100 ${
+            isExtraSmall ? "text-sm mt-3 mb-1" : "text-xl mt-5 mb-2"
+          }`}
+          {...props}
+        >
+          {children}
+        </h2>
+      );
+      if (!text || text.length > 50000) return h2El;
+      return <SmartContentBlock content={text} fallback={h2El} />;
+    },
+    h3: ({ node: _node, children, ...props }) => {
+      const text = getTextFromChildren(children)?.trim() ?? "";
+      const h3El = (
+        <h3
+          className={`font-semibold text-dark-100 ${
+            isExtraSmall ? "text-xs mt-2 mb-1" : "text-lg mt-4 mb-2"
+          }`}
+          {...props}
+        >
+          {children}
+        </h3>
+      );
+      if (!text || text.length > 50000) return h3El;
+      return <SmartContentBlock content={text} fallback={h3El} />;
+    },
 
-    // Paragraphs
-    p: ({ node: _node, ...props }) => (
-      <p
-        className={`${textSize} text-dark-200 mb-3 last:mb-0 leading-relaxed`}
-        {...props}
-      />
-    ),
+    // Paragraphs - use SmartContentBlock for JSON and terminal output
+    p: ({ node: _node, children, ...props }) => {
+      const text = getTextFromChildren(children)?.trim() ?? "";
+      const pEl = (
+        <p
+          className={`${textSize} text-dark-200 mb-3 last:mb-0 leading-relaxed`}
+          {...props}
+        >
+          {children}
+        </p>
+      );
+      if (!text || text.length > 50000) return pEl;
+      return (
+        <SmartContentBlock content={text} fallback={pEl} />
+      );
+    },
 
     // Lists
     ul: ({ node, ...props }) => {
@@ -127,7 +164,7 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true,
       const isBlockCode = node?.parent?.type === "pre";
       const content = typeof props.children === "string" ? props.children : String(props.children?.[0] ?? "");
       const isFileLink = !isBlockCode && content && isWorkspaceFilePath(content);
-      const codeClass = `bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono whitespace-nowrap`;
+      const codeClass = `bg-dark-900 px-1.5 py-0.5 rounded text-primary-400 ${textSize} font-mono break-words`;
       if (isFileLink) {
         return (
           <Link
@@ -142,13 +179,50 @@ const MarkdownRenderer = ({ content, size = "sm", className = "", breaks = true,
         <code className={codeClass} {...props} />
       );
     },
-    // Pre wraps fenced code blocks - provides block-level styling
-    pre: ({ node: _node, ...props }) => (
-      <pre
-        className={`bg-dark-900 p-3 rounded text-primary-400 ${textSize} font-mono overflow-x-auto mb-2 [&>code]:p-0 [&>code]:whitespace-pre`}
-        {...props}
-      />
-    ),
+    // Pre wraps fenced code blocks - use JsonBlock/TerminalBlock for json/bash
+    pre: ({ node, children, ...props }) => {
+      const codeNode = node?.children?.[0];
+      const classNames = codeNode?.properties?.className;
+      const lang = Array.isArray(classNames)
+        ? classNames.find((c) => typeof c === "string" && c.startsWith("language-"))
+        : typeof classNames === "string" && classNames.startsWith("language-")
+        ? classNames
+        : null;
+      const langType = lang?.replace("language-", "") ?? "";
+
+      // Extract text: from hast text node, or from React children
+      let text = "";
+      const codeChild = codeNode?.children?.[0];
+      if (codeChild?.type === "text" && codeChild.value) {
+        text = codeChild.value;
+      } else {
+        const ch = children?.props?.children ?? children;
+        text = typeof ch === "string" ? ch : Array.isArray(ch) ? ch.join("") : String(ch ?? "");
+      }
+
+      if (langType === "json" && text.trim()) {
+        return (
+          <div className="mb-2">
+            <JsonBlock content={text} />
+          </div>
+        );
+      }
+      if ((langType === "bash" || langType === "sh" || langType === "shell") && text.trim()) {
+        return (
+          <div className="mb-2">
+            <TerminalBlock content={text} />
+          </div>
+        );
+      }
+      return (
+        <pre
+          className={`bg-dark-900 p-3 rounded text-primary-400 ${textSize} font-mono overflow-x-auto mb-2 [&>code]:p-0 [&>code]:whitespace-pre`}
+          {...props}
+        >
+          {children}
+        </pre>
+      );
+    },
 
     // Blockquote
     blockquote: ({ node: _node, ...props }) => (

@@ -168,6 +168,29 @@ export const getCronJobs = async () => {
   return response.data.data;
 };
 
+// Create a new cron job (admin only)
+export const createCronJob = async (payload) => {
+  const response = await api.post("/openclaw/cron-jobs", payload);
+  return response.data.data;
+};
+
+// Update an existing cron job (admin only)
+export const updateCronJob = async (jobId, payload) => {
+  const response = await api.put(`/openclaw/cron-jobs/${jobId}`, payload);
+  return response.data.data;
+};
+
+// Delete a cron job (admin only)
+export const deleteCronJob = async (jobId) => {
+  await api.delete(`/openclaw/cron-jobs/${jobId}`);
+};
+
+// Set enabled state for a cron job (admin only)
+export const setCronJobEnabled = async (jobId, enabled) => {
+  const response = await api.patch(`/openclaw/cron-jobs/${jobId}/enabled`, { enabled });
+  return response.data.data;
+};
+
 // Task-scoped subagents API
 export const getTaskSubagents = async (taskId) => {
   const response = await api.get(`/tasks/${taskId}/subagents`);
@@ -177,6 +200,23 @@ export const getTaskSubagents = async (taskId) => {
 // OpenClaw Sessions API - get active sessions from OpenClaw Gateway
 export const getOpenClawSessions = async () => {
   const response = await api.get('/openclaw/sessions');
+  return response.data.data;
+};
+
+// Get full message history for a specific session
+export const getSessionMessages = async (sessionKey, { limit = 50, includeTools = false } = {}) => {
+  // Extract sessionId from sessionKey for the URL path
+  // sessionKey format: "agent:coo:main" or similar
+  // We'll use the full key as sessionId since the endpoint accepts it
+  const sessionId = encodeURIComponent(sessionKey);
+  
+  const response = await api.get(`/openclaw/sessions/${sessionId}/messages`, {
+    params: {
+      key: sessionKey,
+      limit,
+      includeTools
+    }
+  });
   return response.data.data;
 };
 

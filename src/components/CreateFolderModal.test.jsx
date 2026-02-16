@@ -67,7 +67,7 @@ describe('CreateFolderModal', () => {
       await user.click(submitButton);
     });
 
-    expect(mockCreateDirectory).toHaveBeenCalledWith({ path: '/newfolder' });
+    expect(mockCreateDirectory).toHaveBeenCalledWith(expect.objectContaining({ path: '/newfolder' }));
     expect(mockShowToast).toHaveBeenCalledWith(
       'Folder "newfolder" created successfully',
       'success'
@@ -91,7 +91,7 @@ describe('CreateFolderModal', () => {
       await user.click(submitButton);
     });
 
-    expect(mockCreateDirectory).toHaveBeenCalledWith({ path: '/documents/subfolder' });
+    expect(mockCreateDirectory).toHaveBeenCalledWith(expect.objectContaining({ path: '/documents/subfolder' }));
   });
 
   it('shows error when folder name is empty', async () => {
@@ -206,6 +206,6 @@ describe('CreateFolderModal', () => {
       await user.click(submitButton);
     });
 
-    expect(mockCreateDirectory).toHaveBeenCalledWith({ path: '/testfolder' });
+    expect(mockCreateDirectory).toHaveBeenCalledWith(expect.objectContaining({ path: '/testfolder' }));
   });
 });

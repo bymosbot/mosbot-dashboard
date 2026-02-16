@@ -102,7 +102,7 @@ describe('Sidebar', () => {
       });
     });
 
-    it('shows Users submenu item for all users', async () => {
+    it('shows Users and Model Fleet submenu items for all users', async () => {
       const user = userEvent.setup();
       useAuthStore.mockReturnValue({
         user: { id: 2, email: 'user@example.com', name: 'Regular User' },
@@ -131,6 +131,10 @@ describe('Sidebar', () => {
         const usersLink = screen.getByText('Users');
         expect(usersLink).toBeInTheDocument();
         expect(usersLink.closest('a')).toHaveAttribute('href', '/settings/users');
+        
+        const modelFleetLink = screen.getByText('Model Fleet');
+        expect(modelFleetLink).toBeInTheDocument();
+        expect(modelFleetLink.closest('a')).toHaveAttribute('href', '/settings/model-fleet');
       });
     });
   });

@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useToastStore } from '../stores/toastStore';
 import { validateFolderName } from '../utils/pathValidation';
 
-export default function CreateFolderModal({ isOpen, onClose, currentPath }) {
+export default function CreateFolderModal({ isOpen, onClose, currentPath, agentId = 'coo' }) {
   const [folderName, setFolderName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createDirectory, listings, fetchListing } = useWorkspaceStore();
@@ -32,13 +32,13 @@ export default function CreateFolderModal({ isOpen, onClose, currentPath }) {
         : `${currentPath}/${trimmedName}`;
       
       // Check if folder or file already exists at this location
-      const cacheKey = `${currentPath}:false`;
+      const cacheKey = `${agentId}:${currentPath}:false`;
       let listing = listings[cacheKey];
       
       // If not in cache, fetch it
       if (!listing) {
         try {
-          const result = await fetchListing({ path: currentPath, recursive: false });
+          const result = await fetchListing({ path: currentPath, recursive: false, agentId });
           listing = result;
         } catch (error) {
           // If we can't fetch the listing, continue anyway
@@ -54,10 +54,10 @@ export default function CreateFolderModal({ isOpen, onClose, currentPath }) {
         return;
       }
       
-      await createDirectory({ path: folderPath });
+      await createDirectory({ path: folderPath, agentId });
       
       // Refetch parent directory listing to update the UI
-      await fetchListing({ path: currentPath, recursive: false, force: true });
+      await fetchListing({ path: currentPath, recursive: false, force: true, agentId });
       
       showToast(`Folder "${trimmedName}" created successfully`, 'success');
       setFolderName('');

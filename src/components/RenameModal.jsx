@@ -3,7 +3,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useToastStore } from '../stores/toastStore';
 
-export default function RenameModal({ isOpen, onClose, file }) {
+export default function RenameModal({ isOpen, onClose, file, agentId = 'coo' }) {
   const [newName, setNewName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createFile, deleteFile, fetchFileContent, fetchListing } = useWorkspaceStore();
@@ -57,22 +57,23 @@ export default function RenameModal({ isOpen, onClose, file }) {
       
       if (file.type === 'file') {
         // For files: read content, create with new name, delete old
-        const fileContent = await fetchFileContent({ path: file.path });
+        const fileContent = await fetchFileContent({ path: file.path, agentId });
         await createFile({ 
           path: newPath, 
           content: fileContent.content,
-          encoding: fileContent.encoding || 'utf8'
+          encoding: fileContent.encoding || 'utf8',
+          agentId
         });
-        await deleteFile({ path: file.path });
+        await deleteFile({ path: file.path, agentId });
         
         // Refetch both parent directories to update the UI
         const oldParentPath = file.path.substring(0, file.path.lastIndexOf('/')) || '/';
         const newParentPath = newPath.substring(0, newPath.lastIndexOf('/')) || '/';
         
         // Refetch both if they're different, otherwise just one
-        await fetchListing({ path: oldParentPath, recursive: false, force: true });
+        await fetchListing({ path: oldParentPath, recursive: false, force: true, agentId });
         if (oldParentPath !== newParentPath) {
-          await fetchListing({ path: newParentPath, recursive: false, force: true });
+          await fetchListing({ path: newParentPath, recursive: false, force: true, agentId });
         }
         
         showToast(`File renamed to "${trimmedName}"`, 'success');

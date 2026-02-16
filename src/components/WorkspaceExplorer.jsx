@@ -725,24 +725,28 @@ export default function WorkspaceExplorer({
         isOpen={showCreateFileModal}
         onClose={() => setShowCreateFileModal(false)}
         currentPath={modalTargetPath}
+        agentId={agentId}
       />
       
       <CreateFolderModal
         isOpen={showCreateFolderModal}
         onClose={() => setShowCreateFolderModal(false)}
         currentPath={modalTargetPath}
+        agentId={agentId}
       />
       
       <RenameModal
         isOpen={showRenameModal}
         onClose={() => setShowRenameModal(false)}
         file={modalTargetFile}
+        agentId={agentId}
       />
       
       <DeleteConfirmModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         file={modalTargetFile}
+        agentId={agentId}
       />
     </div>
   );

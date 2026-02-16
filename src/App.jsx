@@ -11,9 +11,11 @@ import OrgChart from './pages/OrgChart';
 import Workspace from './pages/Workspace';
 import Docs from './pages/Docs';
 import Subagents from './pages/Subagents';
+import CronJobs from './pages/CronJobs';
 import Log from './pages/Log';
 import Archived from './pages/Archived';
 import Settings from './pages/Settings';
+import ModelFleetSettings from './pages/ModelFleetSettings';
 import TaskView from './pages/TaskView';
 import { useAuthStore } from './stores/authStore';
 import { useAgentStore } from './stores/agentStore';
@@ -56,10 +58,13 @@ function App() {
             <Route path="/workspaces" element={<Navigate to={`/workspaces/${getDefaultAgent()?.id || 'coo'}`} replace />} />
             <Route path="/workspaces/:agentId/*" element={<Layout><Workspace /></Layout>} />
             <Route path="/subagents" element={<Layout><Subagents /></Layout>} />
+            <Route path="/scheduler" element={<Layout><CronJobs /></Layout>} />
+            <Route path="/cron-jobs" element={<Navigate to="/scheduler" replace />} />
             <Route path="/log" element={<Layout><Log /></Layout>} />
             <Route path="/archived" element={<Layout><Archived /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
             <Route path="/settings/users" element={<Layout><Settings /></Layout>} />
+            <Route path="/settings/model-fleet" element={<Layout><ModelFleetSettings /></Layout>} />
             <Route path="/task/:id" element={<Layout><TaskView /></Layout>} />
           </Route>
         </Routes>

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   PlayIcon, 
   ClockIcon, 
@@ -7,47 +8,28 @@ import {
   CircleStackIcon,
   ExclamationTriangleIcon,
   CalendarDaysIcon,
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
 import StatCard from '../components/StatCard';
 import SessionList from '../components/SessionList';
+import SessionDetailPanel from '../components/SessionDetailPanel';
 import CronJobList from '../components/CronJobList';
-import { getOpenClawSessions, getCronJobs } from '../api/client';
+import { getCronJobs } from '../api/client';
 import { useBotStore } from '../stores/botStore';
 import logger from '../utils/logger';
 
-const SUBAGENT_POLLING_INTERVAL = 10000; // 10 seconds
-
 export default function TaskManagerOverview() {
-  const setSessionCounts = useBotStore((state) => state.setSessionCounts);
-  const [subagents, setSubagents] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  // Sessions come from the global store (single poller in GlobalSessionPoller)
+  const sessions = useBotStore((state) => state.sessions);
+  const sessionsLoaded = useBotStore((state) => state.sessionsLoaded);
+  const sessionsError = useBotStore((state) => state.sessionsError);
+  const fetchSessions = useBotStore((state) => state.fetchSessions);
+
   const [cronJobs, setCronJobs] = useState([]);
   const [cronJobsLoading, setCronJobsLoading] = useState(true);
-  
-  const subagentPollingRef = useRef(null);
-
-  // Fetch sessions from OpenClaw Gateway
-  const loadSubagents = useCallback(async () => {
-    try {
-      const data = await getOpenClawSessions();
-      const sessions = data || [];
-      setSubagents(sessions);
-      setError(null);
-      setSessionCounts({
-        running: sessions.filter(s => s.status === "running").length,
-        active: sessions.filter(s => s.status === "active").length,
-        idle: sessions.filter(s => s.status === "idle").length,
-        total: sessions.length,
-      });
-    } catch (err) {
-      logger.error("Failed to fetch sessions", err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setSessionCounts]);
+  const [selectedSession, setSelectedSession] = useState(null);
 
   // Fetch cron job configuration (one-time, no polling needed)
   const loadCronJobs = useCallback(async () => {
@@ -56,7 +38,7 @@ export default function TaskManagerOverview() {
       const data = await getCronJobs();
       setCronJobs(data || []);
     } catch (err) {
-      logger.error("Failed to fetch cron jobs", err);
+      logger.error('Failed to fetch cron jobs', err);
     } finally {
       setCronJobsLoading(false);
     }
@@ -64,60 +46,38 @@ export default function TaskManagerOverview() {
 
   // Calculate metrics from sessions
   const metrics = useMemo(() => {
-    const totalTokens = subagents.reduce((sum, session) => {
+    const totalTokens = sessions.reduce((sum, session) => {
       return sum + (session.inputTokens || 0) + (session.outputTokens || 0);
     }, 0);
 
-    const totalCost = subagents.reduce((sum, session) => {
+    const totalCost = sessions.reduce((sum, session) => {
       return sum + (session.messageCost || 0);
     }, 0);
 
     return { totalTokens, totalCost };
-  }, [subagents]);
+  }, [sessions]);
 
-  // Initial load
+  // Initial load for cron jobs only (sessions are polled globally)
   useEffect(() => {
-    loadSubagents();
     loadCronJobs();
-  }, [loadSubagents, loadCronJobs]);
-
-  // Polling for subagents (metrics are derived from sessions)
-  useEffect(() => {
-    subagentPollingRef.current = setInterval(() => {
-      loadSubagents();
-    }, SUBAGENT_POLLING_INTERVAL);
-
-    return () => {
-      if (subagentPollingRef.current) {
-        clearInterval(subagentPollingRef.current);
-      }
-    };
-  }, [loadSubagents]);
-
-  // Refresh when tab becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadSubagents();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [loadSubagents]);
+  }, [loadCronJobs]);
 
   const handleRefresh = async () => {
-    setIsLoading(true);
-    await loadSubagents();
+    await fetchSessions();
   };
 
+  const handleSessionClick = useCallback((session) => {
+    setSelectedSession(session);
+  }, []);
+
+  const handleClosePanel = useCallback(() => {
+    setSelectedSession(null);
+  }, []);
+
   // Calculate session KPIs
-  const runningCount = subagents.filter(s => s.status === "running").length;
-  const activeCount = subagents.filter(s => s.status === "active").length;
-  const idleCount = subagents.filter(s => s.status === "idle").length;
+  const runningCount = sessions.filter(s => s.status === 'running').length;
+  const activeCount = sessions.filter(s => s.status === 'active').length;
+  const idleCount = sessions.filter(s => s.status === 'idle').length;
 
   // Calculate cron job health metrics
   const cronJobIssues = useMemo(() => {
@@ -154,11 +114,11 @@ export default function TaskManagerOverview() {
   // "Running" = actively processing (updated within 2 min)
   // "Active" = recently used (updated within 30 min)
   // "Idle" = not recently active (updated >30 min ago)
-  const runningSessions = subagents.filter(s => s.status === "running");
-  const activeSessions = subagents.filter(s => s.status === "active");
-  const idleSessions = subagents.filter(s => s.status === "idle");
+  const runningSessions = sessions.filter(s => s.status === 'running');
+  const activeSessions = sessions.filter(s => s.status === 'active');
+  const idleSessions = sessions.filter(s => s.status === 'idle');
 
-  if (isLoading && subagents.length === 0) {
+  if (!sessionsLoaded && sessions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -169,12 +129,12 @@ export default function TaskManagerOverview() {
     );
   }
 
-  if (error && subagents.length === 0) {
+  if (sessionsError && sessions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <p className="text-red-500 mb-2">Error loading overview</p>
-          <p className="text-dark-500 text-sm">{error}</p>
+          <p className="text-dark-500 text-sm">{sessionsError}</p>
         </div>
       </div>
     );
@@ -238,6 +198,7 @@ export default function TaskManagerOverview() {
             sessions={[...runningSessions, ...activeSessions]}
             title="Active Sessions"
             emptyMessage="No active sessions"
+            onSessionClick={handleSessionClick}
           />
 
           {/* Idle Sessions */}
@@ -245,12 +206,32 @@ export default function TaskManagerOverview() {
             sessions={idleSessions}
             title="Idle Sessions"
             emptyMessage="No idle sessions"
+            onSessionClick={handleSessionClick}
           />
 
           {/* Cron Jobs */}
-          <CronJobList jobs={cronJobs} isLoading={cronJobsLoading} />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-dark-100">Cron Jobs</h3>
+              <button
+                onClick={() => navigate('/cron-jobs')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-400 hover:text-primary-300 hover:bg-dark-800 rounded transition-colors"
+              >
+                Manage Jobs
+                <ArrowRightIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <CronJobList jobs={cronJobs} isLoading={cronJobsLoading} />
+          </div>
         </div>
       </div>
+
+      {/* Session Detail Panel */}
+      <SessionDetailPanel 
+        isOpen={!!selectedSession}
+        onClose={handleClosePanel}
+        session={selectedSession}
+      />
     </div>
   );
 }
