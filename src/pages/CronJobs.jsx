@@ -8,7 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Header from "../components/Header";
 import MarkdownRenderer from "../components/MarkdownRenderer";
-import { api, getCronJobs, createCronJob, updateCronJob, deleteCronJob, setCronJobEnabled } from "../api/client";
+import { api, getCronJobs, createCronJob, updateCronJob, deleteCronJob, setCronJobEnabled, triggerCronJob, getInstanceConfig } from "../api/client";
 import { useToastStore } from '../stores/toastStore';
 import { useAgentStore } from '../stores/agentStore';
 import logger from '../utils/logger';
@@ -21,6 +21,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
+  PlayIcon,
 } from '@heroicons/react/24/outline';
 
 // Copied and adapted from CronJobList.jsx
@@ -147,13 +148,13 @@ function getStatusBadge(status, enabled, nextRunAt, lastRunAt) {
   };
 }
 
-function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, agents }) {
+function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, onTrigger, agents }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const badge = getStatusBadge(job.status, job.enabled, job.nextRunAt, job.lastRunAt);
   const BadgeIcon = badge.icon;
   const isHeartbeat = job.source === 'config' || job.payload?.kind === 'heartbeat';
 
-  const prompt = job.payload?.message || job.payload?.text || job.prompt || null;
+  const prompt = job.payload?.message || job.payload?.text || job.payload?.prompt || job.prompt || null;
   const agentId = job.agentId || null;
   
   // Get model: use job-specific model, or fall back to agent's default model
@@ -184,11 +185,15 @@ function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, agents }) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
               <p className="text-base font-semibold text-dark-100">{job.name}</p>
-              {isHeartbeat && (
-                <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-pink-400 bg-pink-500/10 border border-pink-500/20 rounded">
-                  config
-                </span>
-              )}
+              <span
+                className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded border ${
+                  isHeartbeat
+                    ? 'text-pink-400 bg-pink-500/10 border-pink-500/20'
+                    : 'text-purple-400 bg-purple-500/10 border-purple-500/20'
+                }`}
+              >
+                {isHeartbeat ? 'HEARTBEAT' : 'CRON'}
+              </span>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -200,6 +205,16 @@ function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, agents }) {
               </span>
               {/* Action buttons - visible on hover on desktop, always visible on mobile */}
               <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity">
+                {/* Run Now button - only for enabled jobs */}
+                {job.enabled !== false && (
+                  <button
+                    onClick={() => onTrigger(job)}
+                    className="p-1.5 text-dark-400 hover:text-green-400 hover:bg-dark-700 rounded transition-colors"
+                    title="Run now"
+                  >
+                    <PlayIcon className="w-4 h-4" />
+                  </button>
+                )}
                 {/* Enable/Disable button - only for gateway jobs */}
                 {!isHeartbeat && (
                   <button
@@ -380,7 +395,7 @@ function parseCronExpression(expr) {
   return null;
 }
 
-function CronJobModal({ isOpen, onClose, job, onSave }) {
+function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
   const agents = useAgentStore((state) => state.agents);
   const [formData, setFormData] = useState({
     name: '',
@@ -449,6 +464,11 @@ function CronJobModal({ isOpen, onClose, job, onSave }) {
         }
       }
       
+      // Extract prompt from official format (text for systemEvent, message for agentTurn)
+      const promptText = job.payload?.message || job.payload?.text || job.payload?.prompt || job.prompt || '';
+      // Extract session target from top-level or payload
+      const sessionTargetValue = job.sessionTarget || job.payload?.session || 'main';
+
       setFormData({
         name: job.name || '',
         description: job.description || '',
@@ -456,10 +476,10 @@ function CronJobModal({ isOpen, onClose, job, onSave }) {
         cronExpr: schedule.expr || '',
         everyInterval,
         everyUnit,
-        prompt: job.payload?.message || job.payload?.text || job.payload?.prompt || job.prompt || '',
+        prompt: promptText,
         agentId: job.agentId || '',
         model: job.payload?.model || '',
-        sessionTarget: job.payload?.session || job.sessionTarget || 'main',
+        sessionTarget: sessionTargetValue,
         deliveryMode: job.delivery?.mode || 'announce',
         enabled: job.enabled !== false,
         target: job.payload?.target || 'last',
@@ -499,6 +519,7 @@ function CronJobModal({ isOpen, onClose, job, onSave }) {
         enabled: formData.enabled,
         agentId: formData.agentId || undefined,
         schedule: {},
+        sessionTarget: formData.sessionTarget || 'main',
         payload: {},
       };
 
@@ -506,6 +527,7 @@ function CronJobModal({ isOpen, onClose, job, onSave }) {
         payload.schedule = {
           kind: 'cron',
           expr: formData.cronExpr.trim(),
+          tz: timezone,
         };
       } else if (formData.scheduleKind === 'every') {
         const intervalValue = parseInt(formData.everyInterval, 10);
@@ -517,11 +539,32 @@ function CronJobModal({ isOpen, onClose, job, onSave }) {
         };
       }
 
-      if (formData.prompt.trim()) {
-        payload.payload.message = formData.prompt.trim();
-        // For heartbeats, also set prompt field
-        if (isHeartbeat) {
+      if (isHeartbeat) {
+        // Heartbeat-specific payload
+        payload.payload.kind = 'heartbeat';
+        payload.payload.target = formData.target;
+        const ackMaxChars = parseInt(formData.ackMaxChars, 10);
+        if (!isNaN(ackMaxChars) && ackMaxChars > 0) {
+          payload.payload.ackMaxChars = ackMaxChars;
+        }
+        if (formData.prompt.trim()) {
           payload.payload.prompt = formData.prompt.trim();
+          payload.payload.message = formData.prompt.trim();
+        }
+        payload.payload.session = formData.sessionTarget;
+      } else {
+        // Gateway cron job — use official OpenClaw payload.kind
+        if (formData.sessionTarget === 'isolated') {
+          payload.payload.kind = 'agentTurn';
+          if (formData.prompt.trim()) {
+            payload.payload.message = formData.prompt.trim();
+          }
+        } else {
+          payload.payload.kind = 'systemEvent';
+          if (formData.prompt.trim()) {
+            payload.payload.text = formData.prompt.trim();
+            payload.payload.message = formData.prompt.trim();
+          }
         }
       }
 
@@ -529,30 +572,11 @@ function CronJobModal({ isOpen, onClose, job, onSave }) {
         payload.payload.model = formData.model.trim();
       }
 
-      // Add session target
-      if (formData.sessionTarget) {
-        payload.sessionTarget = formData.sessionTarget;
-        // For heartbeats, also set session in payload
-        if (isHeartbeat) {
-          payload.payload.session = formData.sessionTarget;
-        }
-      }
-
-      // Add delivery mode (always include if specified)
+      // Delivery config
       if (formData.deliveryMode) {
         payload.delivery = {
           mode: formData.deliveryMode,
         };
-      }
-
-      // Add heartbeat-specific fields
-      if (isHeartbeat) {
-        payload.payload.target = formData.target;
-        const ackMaxChars = parseInt(formData.ackMaxChars, 10);
-        if (!isNaN(ackMaxChars) && ackMaxChars > 0) {
-          payload.payload.ackMaxChars = ackMaxChars;
-        }
-        payload.payload.kind = 'heartbeat';
       }
 
       await onSave(payload);
@@ -691,10 +715,11 @@ function CronJobModal({ isOpen, onClose, job, onSave }) {
                         {cronPreview ? (
                           <p className="text-xs text-primary-400 mt-1.5 font-medium">
                             {cronPreview}
+                            <span className="text-dark-500 font-normal ml-1">({timezone})</span>
                           </p>
                         ) : (
                           <p className="text-xs text-dark-500 mt-1">
-                            {`Example: "0 9 * * *" = daily at 9:00 AM`}
+                            {`Example: "0 9 * * *" = daily at 9:00 AM (${timezone})`}
                           </p>
                         )}
                       </div>
@@ -980,6 +1005,7 @@ export default function CronJobs() {
   const [editingJob, setEditingJob] = useState(null);
   const [deletingJob, setDeletingJob] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [instanceTimezone, setInstanceTimezone] = useState('UTC');
   const showToast = useToastStore((state) => state.showToast);
 
   const loadJobs = useCallback(async () => {
@@ -997,6 +1023,11 @@ export default function CronJobs() {
 
   useEffect(() => {
     loadJobs();
+    getInstanceConfig()
+      .then((config) => {
+        if (config?.timezone) setInstanceTimezone(config.timezone);
+      })
+      .catch(() => { /* keep default UTC */ });
   }, [loadJobs]);
 
   const handleCreate = async (payload) => {
@@ -1030,6 +1061,17 @@ export default function CronJobs() {
     } catch (error) {
       logger.error('Failed to toggle cron job', error);
       showToast(error.response?.data?.error?.message || 'Failed to toggle scheduled job', 'error');
+    }
+  };
+
+  const handleTrigger = async (job) => {
+    try {
+      await triggerCronJob(job.jobId || job.id);
+      showToast(`"${job.name}" triggered — it will run within the next 60 seconds`, 'success');
+      await loadJobs();
+    } catch (error) {
+      logger.error('Failed to trigger cron job', error);
+      showToast(error.response?.data?.error?.message || 'Failed to trigger scheduled job', 'error');
     }
   };
 
@@ -1166,78 +1208,91 @@ export default function CronJobs() {
                 </button>
               )}
             </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Show grouped sections only when viewing all jobs */}
-              {filter === 'all' && scheduledJobs.length > 0 && heartbeatJobs.length > 0 ? (
-                <>
-                  {/* Scheduled Jobs Section */}
-                  {scheduledJobs.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wide">
-                          Scheduled Jobs
-                        </h3>
-                        <span className="px-2 py-0.5 text-xs font-medium bg-dark-700 text-dark-400 rounded">
-                          {scheduledJobs.length}
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        {scheduledJobs.map((job) => (
-                          <CronJobRow
-                            key={job.jobId || job.id || job.name}
-                            job={job}
-                            agents={agents}
-                            onEdit={setEditingJob}
-                            onDelete={setDeletingJob}
-                            onToggleEnabled={handleToggleEnabled}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Heartbeats Section */}
-                  {heartbeatJobs.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wide">
-                          Heartbeats
-                        </h3>
-                        <span className="px-2 py-0.5 text-xs font-medium bg-dark-700 text-dark-400 rounded">
-                          {heartbeatJobs.length}
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        {heartbeatJobs.map((job) => (
-                          <CronJobRow
-                            key={job.jobId || job.id || job.name}
-                            job={job}
-                            agents={agents}
-                            onEdit={setEditingJob}
-                            onDelete={setDeletingJob}
-                            onToggleEnabled={handleToggleEnabled}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Ungrouped list for filtered views */
-                <div className="space-y-3">
-                  {filteredJobs.map((job) => (
-                    <CronJobRow
-                      key={job.jobId || job.id || job.name}
-                      job={job}
-                      agents={agents}
-                      onEdit={setEditingJob}
-                      onDelete={setDeletingJob}
-                      onToggleEnabled={handleToggleEnabled}
-                    />
-                  ))}
+          ) : filter === 'all' ? (
+            /* Sectioned view: Cron (Gateway) vs Heartbeat (Config) */
+            <div className="space-y-8">
+              {/* Cron (Gateway) Section */}
+              <section>
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wide">
+                    Cron (Gateway)
+                  </h3>
+                  <span className="px-2 py-0.5 text-xs font-medium bg-dark-700 text-dark-400 rounded">
+                    {scheduledJobs.length}
+                  </span>
                 </div>
-              )}
+                {scheduledJobs.length === 0 ? (
+                  <p className="text-sm text-dark-500 py-4">No gateway-scheduled jobs</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {scheduledJobs.map((job) => (
+                      <CronJobRow
+                        key={job.jobId || job.id || job.name}
+                        job={job}
+                        agents={agents}
+                        onEdit={setEditingJob}
+                        onDelete={setDeletingJob}
+                        onToggleEnabled={handleToggleEnabled}
+                        onTrigger={handleTrigger}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Heartbeat (Config) Section */}
+              <section>
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wide">
+                    Heartbeat (Config)
+                  </h3>
+                  <span className="px-2 py-0.5 text-xs font-medium bg-dark-700 text-dark-400 rounded">
+                    {heartbeatJobs.length}
+                  </span>
+                </div>
+                {heartbeatJobs.length === 0 ? (
+                  <p className="text-sm text-dark-500 py-4">No config heartbeats</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {heartbeatJobs.map((job) => (
+                      <CronJobRow
+                        key={job.jobId || job.id || job.name}
+                        job={job}
+                        agents={agents}
+                        onEdit={setEditingJob}
+                        onDelete={setDeletingJob}
+                        onToggleEnabled={handleToggleEnabled}
+                        onTrigger={handleTrigger}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          ) : (
+            /* Filtered view: single section based on filter */
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-3">
+                <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wide">
+                  {filter === 'gateway' ? 'Cron (Gateway)' : filter === 'config' ? 'Heartbeat (Config)' : 'Jobs'}
+                </h3>
+                <span className="px-2 py-0.5 text-xs font-medium bg-dark-700 text-dark-400 rounded">
+                  {filteredJobs.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredJobs.map((job) => (
+                  <CronJobRow
+                    key={job.jobId || job.id || job.name}
+                    job={job}
+                    agents={agents}
+                    onEdit={setEditingJob}
+                    onDelete={setDeletingJob}
+                    onToggleEnabled={handleToggleEnabled}
+                    onTrigger={handleTrigger}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1249,6 +1304,7 @@ export default function CronJobs() {
         onClose={() => setIsCreateModalOpen(false)}
         job={null}
         onSave={handleCreate}
+        timezone={instanceTimezone}
       />
 
       <CronJobModal
@@ -1256,6 +1312,7 @@ export default function CronJobs() {
         onClose={() => setEditingJob(null)}
         job={editingJob}
         onSave={handleUpdate}
+        timezone={instanceTimezone}
       />
 
       <DeleteConfirmModal

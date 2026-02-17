@@ -12,8 +12,8 @@ The **Task Manager Overview** is the runtime operations view of MosBot OS.
 - Session KPIs (example): **Running / Active / Idle / Total**
 - Usage metrics (example): **Tokens Used** and **Total Cost** (derived from session data)
 - Session lists (example):
-  - **Active Sessions** (running + active)
-  - **Idle Sessions**
+  - **Active Sessions** (only shown when sessions are running)
+  - **Idle Sessions** (active + idle; non-running sessions)
 - **Cron Jobs**: scheduled automation configuration and visibility
 
 ## Update behavior

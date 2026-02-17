@@ -114,6 +114,12 @@ api.interceptors.response.use(
   }
 );
 
+// Instance config — non-sensitive server settings (timezone, etc.)
+export const getInstanceConfig = async () => {
+  const response = await api.get('/config');
+  return response.data.data;
+};
+
 // OpenClaw Agents API - auto-discover agents from OpenClaw configuration
 export const getAgents = async () => {
   const response = await api.get('/openclaw/agents');
@@ -189,6 +195,12 @@ export const deleteCronJob = async (jobId) => {
 export const setCronJobEnabled = async (jobId, enabled) => {
   const response = await api.patch(`/openclaw/cron-jobs/${jobId}/enabled`, { enabled });
   return response.data.data;
+};
+
+// Manually trigger a cron job to run now (admin only)
+export const triggerCronJob = async (jobId) => {
+  const response = await api.post(`/openclaw/cron-jobs/${jobId}/trigger`);
+  return response.data;
 };
 
 // Task-scoped subagents API

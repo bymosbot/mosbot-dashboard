@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
+import { useEffect, useState, useMemo, useCallback, Fragment, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
 import { 
@@ -47,7 +47,6 @@ export default function WorkspaceExplorer({
   agent, 
   initialFilePath = null,
   routeBase = null, // If null, defaults to `/workspaces/${agentId}`
-  breadcrumbRootLabel = 'workspaces',
   showAgentSelector = true,
   workspaceRootPath: workspaceRootPathOverride = null
 }) {
@@ -78,6 +77,7 @@ export default function WorkspaceExplorer({
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingPaths, setLoadingPaths] = useState(new Set());
   const [treeKey, setTreeKey] = useState(0); // Key to force tree remount on refresh
+  const [justSwitchedWorkspace, setJustSwitchedWorkspace] = useState(false);
   
   // Modal states
   const [showCreateFileModal, setShowCreateFileModal] = useState(false);
@@ -92,6 +92,9 @@ export default function WorkspaceExplorer({
   
   const canModify = isAdmin();
   
+  // Track previous agentId to detect workspace changes
+  const prevAgentIdRef = useRef(agentId);
+  
   // Initialize workspace root path when agent changes
   useEffect(() => {
     const rootPath = workspaceRootPathOverride || agent?.workspaceRootPath;
@@ -99,6 +102,46 @@ export default function WorkspaceExplorer({
       setWorkspaceRootPath(rootPath);
     }
   }, [workspaceRootPathOverride, agent?.workspaceRootPath, setWorkspaceRootPath]);
+  
+  // Sync URL path to selection on mount or when navigating via link
+  // IMPORTANT: Must be declared before any useEffect that references it
+  const normalizedPath = useMemo(
+    () => normalizeFilePathParam(initialFilePath),
+    [initialFilePath]
+  );
+  
+  // Clear state when switching between workspaces (agentId changes)
+  // This must run synchronously before other effects to prevent stale state issues
+  useEffect(() => {
+    const prevAgentId = prevAgentIdRef.current;
+    
+    // Detect workspace change
+    if (prevAgentId !== agentId) {
+      // Set flag to suppress error banners during transition
+      setJustSwitchedWorkspace(true);
+      
+      // Clear all errors and cached data from previous workspace
+      clearErrors();
+      useWorkspaceStore.getState().clearAllListingCache();
+      useWorkspaceStore.getState().clearAllContentCache();
+      
+      // Reset to root path and navigate to base URL if no specific file path
+      if (!normalizedPath) {
+        setCurrentPath('/');
+        setSelectedFile(null);
+        // Force navigation to base route to clear any stale file paths from URL
+        navigate(actualRouteBase, { replace: true });
+      }
+      
+      // Update ref for next comparison
+      prevAgentIdRef.current = agentId;
+      
+      // Clear the flag after a short delay to allow state to settle
+      setTimeout(() => {
+        setJustSwitchedWorkspace(false);
+      }, 100);
+    }
+  }, [agentId, clearErrors, setCurrentPath, setSelectedFile, normalizedPath, navigate, actualRouteBase]);
   
   // Always fetch non-recursively (one level at a time)
   const recursive = false;
@@ -122,12 +165,6 @@ export default function WorkspaceExplorer({
     });
     return cache;
   }, [listings, agentId]);
-  
-  // Sync URL path to selection on mount or when navigating via link
-  const normalizedPath = useMemo(
-    () => normalizeFilePathParam(initialFilePath),
-    [initialFilePath]
-  );
 
   useEffect(() => {
     if (!normalizedPath) return;
@@ -138,7 +175,14 @@ export default function WorkspaceExplorer({
       // Directory view (e.g. breadcrumb click): show folder contents, no file selected
       setCurrentPath(path);
       setSelectedFile(null);
-      fetchListing({ path, recursive: false, agentId }).catch(() => {});
+      fetchListing({ path, recursive: false, agentId }).catch((error) => {
+        // If directory doesn't exist (404), redirect to root
+        if (error.response?.status === 404) {
+          setCurrentPath('/');
+          setSelectedFile(null);
+          navigate(actualRouteBase, { replace: true });
+        }
+      });
     } else {
       // File view: select file and show parent in tree
       const lastSlash = path.lastIndexOf('/');
@@ -152,19 +196,29 @@ export default function WorkspaceExplorer({
         type: 'file'
       });
 
-      fetchListing({ path: parentPath, recursive: false, agentId }).catch(() => {});
+      fetchListing({ path: parentPath, recursive: false, agentId }).catch((error) => {
+        // If parent directory doesn't exist (404), redirect to root
+        if (error.response?.status === 404) {
+          setCurrentPath('/');
+          setSelectedFile(null);
+          navigate(actualRouteBase, { replace: true });
+        }
+      });
     }
-  }, [normalizedPath, setCurrentPath, setSelectedFile, fetchListing, agentId]);
+  }, [normalizedPath, setCurrentPath, setSelectedFile, fetchListing, agentId, navigate, actualRouteBase]);
 
   // Initial load
   useEffect(() => {
     // Avoid infinite retry loops: if this path/view already failed, wait for user action (refresh).
     if (!currentListing && !isLoadingListing && !currentListingError) {
       fetchListing({ path: currentPath, recursive, agentId }).catch((error) => {
-        showToast(
-          error.response?.data?.error?.message || 'Failed to load workspace',
-          'error'
-        );
+        // Only show toast if it's not a 404 (404s are handled by redirect logic)
+        if (error.response?.status !== 404) {
+          showToast(
+            error.response?.data?.error?.message || 'Failed to load workspace',
+            'error'
+          );
+        }
       });
     }
   }, [
@@ -261,12 +315,40 @@ export default function WorkspaceExplorer({
     }
   };
   
-  // Get breadcrumbs from current path
-  const breadcrumbs = currentPath.split('/').filter(Boolean).reduce((acc, part, index, arr) => {
-    const path = '/' + arr.slice(0, index + 1).join('/');
-    acc.push({ name: part, path });
-    return acc;
-  }, [{ name: breadcrumbRootLabel, path: '/' }]);
+  // Get breadcrumbs from current path, prefixed with the workspace root path
+  const { workspaceRootPath: storeRootPath } = useWorkspaceStore();
+  const effectiveRootPath = workspaceRootPathOverride || storeRootPath || '';
+  const rootSegments = effectiveRootPath.split('/').filter(Boolean);
+
+  const breadcrumbs = useMemo(() => {
+    const crumbs = [];
+
+    // Build root-path breadcrumbs from the workspace root path.
+    // All segments except the last are non-clickable context; the last
+    // segment is clickable and navigates to "/" (workspace root).
+    rootSegments.forEach((seg, i) => {
+      const isLast = i === rootSegments.length - 1;
+      crumbs.push({
+        name: seg,
+        path: isLast ? "/" : null,
+        isRootPrefix: !isLast,
+      });
+    });
+
+    // Add the browsable path breadcrumbs (subdirectories within the workspace)
+    const pathParts = currentPath.split("/").filter(Boolean);
+    pathParts.forEach((part, index, arr) => {
+      const path = "/" + arr.slice(0, index + 1).join("/");
+      crumbs.push({ name: part, path, isRootPrefix: false });
+    });
+
+    // Fallback: if no root segments and at root, show a single "/" indicator
+    if (crumbs.length === 0) {
+      crumbs.push({ name: "/", path: "/", isRootPrefix: false });
+    }
+
+    return crumbs;
+  }, [rootSegments, currentPath]);
   
   // Filter files by search query
   const filteredFiles = currentListing?.files?.filter((file) => {
@@ -330,6 +412,15 @@ export default function WorkspaceExplorer({
     setSelectedFile(null);
     const urlPath = path === '/' ? '' : `${path}/`;
     navigate(`${actualRouteBase}${urlPath}`, { replace: true });
+  }, [setCurrentPath, setSelectedFile, navigate, agentId, actualRouteBase]);
+  
+  // When file is not found (404) - redirect to root
+  const handleFileNotFound = useCallback((path) => {
+    useWorkspaceStore.getState().clearErrors();
+    useWorkspaceStore.getState().clearContentCache(path, agentId);
+    setCurrentPath('/');
+    setSelectedFile(null);
+    navigate(actualRouteBase, { replace: true });
   }, [setCurrentPath, setSelectedFile, navigate, agentId, actualRouteBase]);
   
   // Drag and drop handlers
@@ -467,23 +558,32 @@ export default function WorkspaceExplorer({
             {showAgentSelector && <div className="w-px h-6 bg-dark-700" />}
           </div>
           
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <nav className="flex items-center gap-1 text-sm">
+          <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+            <nav className="flex items-center gap-1 text-sm overflow-hidden">
               {breadcrumbs.map((crumb, index) => (
-                <div key={crumb.path} className="flex items-center gap-1">
+                <div key={`${index}-${crumb.name}`} className="flex items-center gap-1">
                   {index > 0 && <ChevronRightIcon className="w-4 h-4 text-dark-500 flex-shrink-0" />}
-                  <button
-                    onClick={() => handleBreadcrumbClick(crumb.path)}
-                    className={classNames(
-                      'px-2 py-1 rounded hover:bg-dark-800 transition-colors truncate max-w-[8rem]',
-                      index === breadcrumbs.length - 1
-                        ? 'text-primary-400 font-medium'
-                        : 'text-dark-400'
-                    )}
-                    title={crumb.path}
-                  >
-                    {crumb.name}
-                  </button>
+                  {crumb.isRootPrefix ? (
+                    <span
+                      className="px-2 py-1 truncate max-w-[10rem] text-dark-500"
+                      title={effectiveRootPath}
+                    >
+                      {crumb.name}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleBreadcrumbClick(crumb.path)}
+                      className={classNames(
+                        'px-2 py-1 rounded hover:bg-dark-800 transition-colors truncate max-w-[10rem]',
+                        index === breadcrumbs.length - 1
+                          ? 'text-primary-400 font-medium'
+                          : 'text-dark-400'
+                      )}
+                      title={crumb.path}
+                    >
+                      {crumb.name}
+                    </button>
+                  )}
                 </div>
               ))}
             </nav>
@@ -568,8 +668,8 @@ export default function WorkspaceExplorer({
         </div>
       </div>
       
-      {/* Error banner */}
-      {currentListingError && (
+      {/* Error banner - hide during workspace transitions to prevent flashing stale errors */}
+      {currentListingError && !justSwitchedWorkspace && (
         <div className="px-4 py-2 bg-red-900/20 border-b border-red-900/50 text-red-300 text-sm flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-medium text-red-300">Failed to load workspace files</p>
@@ -699,7 +799,8 @@ export default function WorkspaceExplorer({
           file={selectedFile} 
           agentId={agentId} 
           onDelete={handleDelete} 
-          onPathIsDirectory={handlePathIsDirectory} 
+          onPathIsDirectory={handlePathIsDirectory}
+          onFileNotFound={handleFileNotFound}
           workspaceBaseUrl={actualRouteBase} 
         />
       </div>

@@ -2,7 +2,7 @@ import { ClockIcon, CpuChipIcon, ChatBubbleLeftIcon } from "@heroicons/react/24/
 import { stripMarkdown } from "../utils/helpers";
 import { useAgentStore } from "../stores/agentStore";
 
-export default function SessionRow({ session, onClick }) {
+export default function SessionRow({ session, onClick, statusDisplay }) {
   const getAgentById = useAgentStore((state) => state.getAgentById);
   const agent = session.agent ? getAgentById(session.agent) : null;
   const getStatusColor = (status) => {
@@ -99,9 +99,22 @@ export default function SessionRow({ session, onClick }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-base font-semibold text-dark-100 truncate">
-              {session.label || session.id}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-base font-semibold text-dark-100 truncate">
+                {session.label || session.id}
+              </p>
+              {session.kind && (
+                <span
+                  className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded border flex-shrink-0 ${
+                    session.kind === 'heartbeat'
+                      ? 'text-pink-400 bg-pink-500/10 border-pink-500/20'
+                      : 'text-purple-400 bg-purple-500/10 border-purple-500/20'
+                  }`}
+                >
+                  {session.kind === 'heartbeat' ? 'HEARTBEAT' : 'CRON'}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs">
               {session.agent && (
                 <div className="flex items-center gap-1.5">
@@ -131,8 +144,8 @@ export default function SessionRow({ session, onClick }) {
               <span className="font-medium">{formatDuration(session.updatedAt)}</span>
             </div>
           )}
-          <span className={`px-3 py-1.5 text-xs font-medium rounded-full border ${getStatusColor(session.status)}`}>
-            {session.status}
+          <span className={`px-3 py-1.5 text-xs font-medium rounded-full border ${getStatusColor(statusDisplay ?? session.status)}`}>
+            {statusDisplay ?? session.status}
           </span>
         </div>
       </div>

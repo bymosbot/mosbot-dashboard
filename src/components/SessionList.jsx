@@ -1,6 +1,6 @@
 import SessionRow from './SessionRow';
 
-export default function SessionList({ sessions, title, emptyMessage = 'No sessions', onSessionClick }) {
+export default function SessionList({ sessions, title, emptyMessage = 'No sessions', onSessionClick, displayActiveAsIdle }) {
   return (
     <div className="bg-dark-900 border border-dark-800 rounded-lg p-6">
       <h3 className="text-lg font-semibold text-dark-100 mb-5">{title}</h3>
@@ -9,7 +9,12 @@ export default function SessionList({ sessions, title, emptyMessage = 'No sessio
       ) : (
         <div className="space-y-3">
           {sessions.map((session) => (
-            <SessionRow key={session.id} session={session} onClick={onSessionClick} />
+            <SessionRow
+              key={session.id}
+              session={session}
+              onClick={onSessionClick}
+              statusDisplay={displayActiveAsIdle && session.status === 'active' ? 'idle' : undefined}
+            />
           ))}
         </div>
       )}

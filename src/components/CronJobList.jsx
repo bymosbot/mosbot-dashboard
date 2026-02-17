@@ -182,8 +182,14 @@ function CronJobRow({ job }) {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-base font-semibold text-dark-100">{job.name}</p>
               {job.source && (
-                <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-dark-400 bg-dark-700 rounded">
-                  {job.source === "config" ? "heartbeat" : job.source}
+                <span
+                  className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded border ${
+                    job.source === "config"
+                      ? "text-pink-400 bg-pink-500/10 border-pink-500/20"
+                      : "text-purple-400 bg-purple-500/10 border-purple-500/20"
+                  }`}
+                >
+                  {job.source === "config" ? "HEARTBEAT" : "CRON"}
                 </span>
               )}
             </div>

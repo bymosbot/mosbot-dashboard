@@ -1,48 +1,135 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { 
   PlayIcon, 
   ClockIcon, 
   ChartBarIcon, 
   CurrencyDollarIcon,
   CircleStackIcon,
-  ExclamationTriangleIcon,
-  CalendarDaysIcon,
-  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
 import StatCard from '../components/StatCard';
 import SessionList from '../components/SessionList';
 import SessionDetailPanel from '../components/SessionDetailPanel';
-import CronJobList from '../components/CronJobList';
-import { getCronJobs } from '../api/client';
 import { useBotStore } from '../stores/botStore';
+import { getCronJobs } from '../api/client';
 import logger from '../utils/logger';
 
 export default function TaskManagerOverview() {
-  const navigate = useNavigate();
   // Sessions come from the global store (single poller in GlobalSessionPoller)
   const sessions = useBotStore((state) => state.sessions);
   const sessionsLoaded = useBotStore((state) => state.sessionsLoaded);
   const sessionsError = useBotStore((state) => state.sessionsError);
   const fetchSessions = useBotStore((state) => state.fetchSessions);
 
-  const [cronJobs, setCronJobs] = useState([]);
-  const [cronJobsLoading, setCronJobsLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState(null);
 
-  // Fetch cron job configuration (one-time, no polling needed)
-  const loadCronJobs = useCallback(async () => {
+  // Recent cron/heartbeat activity
+  const [recentJobs, setRecentJobs] = useState([]);
+  const [jobsLoaded, setJobsLoaded] = useState(false);
+
+  const loadRecentActivity = useCallback(async () => {
     try {
-      setCronJobsLoading(true);
-      const data = await getCronJobs();
-      setCronJobs(data || []);
+      const jobs = await getCronJobs();
+      // Filter to jobs that have actually run, sorted by lastRunAt descending
+      const ranJobs = (jobs || [])
+        .filter(j => j.lastRunAt)
+        .sort((a, b) => new Date(b.lastRunAt) - new Date(a.lastRunAt));
+      setRecentJobs(ranJobs);
+      setJobsLoaded(true);
     } catch (err) {
-      logger.error('Failed to fetch cron jobs', err);
-    } finally {
-      setCronJobsLoading(false);
+      logger.error('Failed to load recent cron activity', err);
     }
   }, []);
+
+  // Transform cron/heartbeat jobs into session-shaped objects so they can
+  // be rendered by the same SessionRow component used for Active / Idle lists.
+  // For cron jobs: use actual execution data from job.lastExecution (queried from cron sessions)
+  // For heartbeats: use the agent's main session data (proxy is correct for heartbeats)
+  const recentActivitySessions = useMemo(() => {
+    // Build a lookup: agentId -> most-recent session for that agent (for heartbeat fallback)
+    const agentSessionMap = new Map();
+    sessions.forEach(s => {
+      if (!s.agent) return;
+      const existing = agentSessionMap.get(s.agent);
+      if (!existing || (s.updatedAt || 0) > (existing.updatedAt || 0)) {
+        agentSessionMap.set(s.agent, s);
+      }
+    });
+
+    return recentJobs.map(job => {
+      // For heartbeat jobs, pull from the agent's main session (correct approach)
+      // For cron jobs, prefer lastExecution data (actual cron run), fallback to agent session
+      const isHeartbeat = job.source === 'config';
+      const agentSession = job.agentId ? agentSessionMap.get(job.agentId) : null;
+      const executionData = job.lastExecution || {};
+
+      // Map job status to a session-style status for the badge colour
+      let status = 'idle';
+      const jobStatus = (job.status || '').toLowerCase();
+      if (jobStatus === 'running' || jobStatus === 'pending') {
+        status = 'running';
+      } else if (jobStatus === 'ok' || jobStatus === 'success' || jobStatus === 'completed') {
+        status = 'completed';
+      } else if (jobStatus === 'failed' || jobStatus === 'error') {
+        status = 'failed';
+      } else if (job.lastRunAt) {
+        // If it ran recently (within 30 min), show as active
+        const age = Date.now() - new Date(job.lastRunAt).getTime();
+        if (age < 30 * 60 * 1000) status = 'active';
+      }
+
+      // For cron jobs: if execution data is unavailable (isolated sessions not accessible),
+      // show a fallback message instead of zeros
+      const executionUnavailable = !isHeartbeat && executionData.unavailable;
+
+      return {
+        id: `activity-${job.jobId || job.id || job.name}`,
+        key: executionData.sessionKey || null,
+        label: job.name,
+        status,
+        kind: job.source === 'config' ? 'heartbeat' : 'cron',
+        updatedAt: job.lastRunAt ? new Date(job.lastRunAt).getTime() : null,
+        agent: job.agentId || null,
+        // For cron: prefer lastExecution data, fallback to agent model
+        // For heartbeat: use agent session data
+        model: isHeartbeat 
+          ? (agentSession?.model || job.agentModel || null)
+          : (executionData.model || job.agentModel || agentSession?.model || null),
+        // Token / cost / context: prefer execution data for cron, use agent session for heartbeat
+        // If execution data is unavailable, use null instead of 0 to trigger fallback display
+        contextTokens: isHeartbeat
+          ? (agentSession?.contextTokens || 0)
+          : (executionUnavailable ? null : (executionData.contextTokens || 0)),
+        totalTokensUsed: isHeartbeat
+          ? (agentSession?.totalTokensUsed || 0)
+          : (executionUnavailable ? null : (executionData.totalTokensUsed || 0)),
+        contextUsagePercent: isHeartbeat
+          ? (agentSession?.contextUsagePercent || 0)
+          : (executionUnavailable ? null : (executionData.contextUsagePercent || 0)),
+        inputTokens: isHeartbeat
+          ? (agentSession?.inputTokens || 0)
+          : (executionUnavailable ? null : (executionData.inputTokens || 0)),
+        outputTokens: isHeartbeat
+          ? (agentSession?.outputTokens || 0)
+          : (executionUnavailable ? null : (executionData.outputTokens || 0)),
+        messageCost: isHeartbeat
+          ? (agentSession?.messageCost || 0)
+          : (executionUnavailable ? null : (executionData.messageCost || 0)),
+        lastMessage: isHeartbeat
+          ? (agentSession?.lastMessage || null)
+          : (executionUnavailable 
+              ? `Status: ${executionData.status || 'unknown'} (Duration: ${executionData.durationMs ? Math.round(executionData.durationMs / 1000) + 's' : 'N/A'})`
+              : (executionData.lastMessage || null)),
+        lastMessageRole: isHeartbeat
+          ? (agentSession?.lastMessageRole || null)
+          : (executionData.lastMessageRole || null),
+      };
+    });
+  }, [recentJobs, sessions]);
+
+  useEffect(() => {
+    loadRecentActivity();
+  }, [loadRecentActivity]);
 
   // Calculate metrics from sessions
   const metrics = useMemo(() => {
@@ -57,13 +144,8 @@ export default function TaskManagerOverview() {
     return { totalTokens, totalCost };
   }, [sessions]);
 
-  // Initial load for cron jobs only (sessions are polled globally)
-  useEffect(() => {
-    loadCronJobs();
-  }, [loadCronJobs]);
-
   const handleRefresh = async () => {
-    await fetchSessions();
+    await Promise.all([fetchSessions(), loadRecentActivity()]);
   };
 
   const handleSessionClick = useCallback((session) => {
@@ -78,37 +160,6 @@ export default function TaskManagerOverview() {
   const runningCount = sessions.filter(s => s.status === 'running').length;
   const activeCount = sessions.filter(s => s.status === 'active').length;
   const idleCount = sessions.filter(s => s.status === 'idle').length;
-
-  // Calculate cron job health metrics
-  const cronJobIssues = useMemo(() => {
-    let issueCount = 0;
-    cronJobs.forEach(job => {
-      // Skip disabled jobs
-      if (job.enabled === false) return;
-      
-      // Check if not scheduled (no nextRunAt or lastRunAt)
-      if (!job.nextRunAt && !job.lastRunAt) {
-        issueCount++;
-        return;
-      }
-      
-      // Check if missed (nextRunAt in the past)
-      if (job.nextRunAt) {
-        const nextRunDate = new Date(job.nextRunAt);
-        const now = new Date();
-        if (nextRunDate < now) {
-          issueCount++;
-          return;
-        }
-      }
-      
-      // Check explicit error status
-      if (job.status === "error") {
-        issueCount++;
-      }
-    });
-    return issueCount;
-  }, [cronJobs]);
 
   // Filter sessions for display
   // "Running" = actively processing (updated within 2 min)
@@ -171,13 +222,6 @@ export default function TaskManagerOverview() {
               color="yellow"
             />
             <StatCard 
-              label="Cron Jobs"
-              sublabel={cronJobIssues > 0 ? `${cronJobIssues} issue${cronJobIssues !== 1 ? 's' : ''}` : 'All healthy'}
-              value={cronJobs.length}
-              icon={cronJobIssues > 0 ? ExclamationTriangleIcon : CalendarDaysIcon}
-              color={cronJobIssues > 0 ? "yellow" : "primary"}
-            />
-            <StatCard 
               label="Recent Tokens"
               sublabel="Last message per session"
               value={metrics.totalTokens.toLocaleString()}
@@ -193,36 +237,35 @@ export default function TaskManagerOverview() {
             />
           </div>
 
-          {/* Active Sessions (running + active, differentiated by label) */}
-          <SessionList 
-            sessions={[...runningSessions, ...activeSessions]}
-            title="Active Sessions"
-            emptyMessage="No active sessions"
-            onSessionClick={handleSessionClick}
-          />
+          {/* Active Sessions — only shown when sessions are running */}
+          {runningSessions.length > 0 && (
+            <SessionList 
+              sessions={runningSessions}
+              title="Active Sessions"
+              emptyMessage="No active sessions"
+              onSessionClick={handleSessionClick}
+            />
+          )}
 
-          {/* Idle Sessions */}
+          {/* Recent Activity — cron and heartbeat job runs */}
+          {jobsLoaded && recentActivitySessions.length > 0 && (
+            <SessionList
+              sessions={recentActivitySessions}
+              title="Recent Activity"
+              emptyMessage="No recent activity"
+              onSessionClick={handleSessionClick}
+              displayActiveAsIdle
+            />
+          )}
+
+          {/* Idle Sessions — active + idle (non-running); fallback when none are running */}
           <SessionList 
-            sessions={idleSessions}
+            sessions={[...activeSessions, ...idleSessions]}
             title="Idle Sessions"
             emptyMessage="No idle sessions"
             onSessionClick={handleSessionClick}
+            displayActiveAsIdle
           />
-
-          {/* Cron Jobs */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-dark-100">Cron Jobs</h3>
-              <button
-                onClick={() => navigate('/cron-jobs')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-400 hover:text-primary-300 hover:bg-dark-800 rounded transition-colors"
-              >
-                Manage Jobs
-                <ArrowRightIcon className="w-4 h-4" />
-              </button>
-            </div>
-            <CronJobList jobs={cronJobs} isLoading={cronJobsLoading} />
-          </div>
         </div>
       </div>
 

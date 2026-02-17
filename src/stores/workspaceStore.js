@@ -213,7 +213,7 @@ export const useWorkspaceStore = create((set, get) => ({
   
   // Clear all listing cache
   clearAllListingCache: () => {
-    set({ listings: {} });
+    set({ listings: {}, listingErrors: {}, listingError: null });
   },
   
   // Clear file content cache
@@ -228,7 +228,7 @@ export const useWorkspaceStore = create((set, get) => ({
   
   // Clear all content cache
   clearAllContentCache: () => {
-    set({ fileContents: {} });
+    set({ fileContents: {}, contentError: null });
   },
   
   // Refresh current listing

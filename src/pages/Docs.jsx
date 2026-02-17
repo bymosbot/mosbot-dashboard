@@ -64,7 +64,6 @@ export default function Docs() {
             }}
             initialFilePath={filePathParam || null}
             routeBase="/docs"
-            breadcrumbRootLabel="docs"
             showAgentSelector={false}
             workspaceRootPath="/workspace/docs"
           />
