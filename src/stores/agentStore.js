@@ -20,7 +20,7 @@ const fallbackAgents = [
     name: 'MosBot',
     label: 'MosBot (COO)',
     description: 'Chief Operating Officer and Task Orchestrator',
-    workspaceRootPath: '/workspace-coo',
+    workspaceRootPath: '/workspace',
     icon: '📊',
     isDefault: false
   },
@@ -75,13 +75,26 @@ export const useAgentStore = create((set, get) => ({
       const agentsData = await getAgents();
       
       // Transform workspace paths to workspaceRootPath format for consistency
-      // Each agent's workspaceRootPath points to their specific workspace directory
-      let agents = agentsData.map(agent => ({
-        ...agent,
-        workspaceRootPath: agent.workspace 
-          ? `/workspace-${agent.id}` 
-          : `/workspace-${agent.id}`,
-      }));
+      // Derive workspaceRootPath from agent.workspace by stripping /home/node/.openclaw/ prefix
+      // Examples:
+      //   /home/node/.openclaw/workspace -> /workspace
+      //   /home/node/.openclaw/workspace-cto -> /workspace-cto
+      let agents = agentsData.map(agent => {
+        let workspaceRootPath = `/workspace-${agent.id}`; // fallback
+        if (agent.workspace) {
+          // Strip /home/node/.openclaw/ prefix if present
+          const prefix = '/home/node/.openclaw/';
+          if (agent.workspace.startsWith(prefix)) {
+            workspaceRootPath = '/' + agent.workspace.substring(prefix.length);
+          } else {
+            workspaceRootPath = agent.workspace;
+          }
+        }
+        return {
+          ...agent,
+          workspaceRootPath,
+        };
+      });
 
       // Filter out API version if present, use our constant
       agents = agents.filter(a => a.id !== 'archived');

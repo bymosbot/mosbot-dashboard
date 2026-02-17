@@ -15,7 +15,7 @@ export const agentWorkspaces = [
     name: 'COO',
     label: 'Chief Operating Officer',
     description: 'Operations and workflow management',
-    workspaceRootPath: '/workspace-coo',
+    workspaceRootPath: '/workspace',
     icon: '📊',
   },
   {
