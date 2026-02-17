@@ -147,8 +147,10 @@ export default function TaskManagerOverview() {
     loadRecentActivity();
   }, [loadRecentActivity]);
 
-  // Calculate metrics from sessions
+  // Calculate metrics from all displayed sessions (including recent activity)
   const metrics = useMemo(() => {
+    // Use sessions for metrics since they have the most accurate token/cost data
+    // Recent activity sessions may have incomplete data for heartbeats
     const totalTokens = sessions.reduce((sum, session) => {
       return sum + (session.inputTokens || 0) + (session.outputTokens || 0);
     }, 0);
@@ -173,10 +175,33 @@ export default function TaskManagerOverview() {
   }, []);
 
   // Calculate session KPIs
-  // Match the section groupings: Running Sessions, Idle Sessions (active + idle)
-  const runningCount = sessions.filter(s => s.status === 'running').length;
-  const activeCount = sessions.filter(s => s.status === 'active').length;
-  const idleCount = sessions.filter(s => s.status === 'idle').length;
+  // Include both OpenClaw sessions AND recent activity sessions (cron/heartbeat)
+  // to ensure KPIs match what's displayed on the page
+  const allDisplayedSessions = useMemo(() => {
+    // Combine sessions and recentActivitySessions, deduplicating by key
+    const sessionMap = new Map();
+    
+    // Add OpenClaw sessions first
+    sessions.forEach(s => {
+      if (s.key) sessionMap.set(s.key, s);
+    });
+    
+    // Add recent activity sessions (won't overwrite if key already exists)
+    recentActivitySessions.forEach(s => {
+      if (s.key && !sessionMap.has(s.key)) {
+        sessionMap.set(s.key, s);
+      } else if (!s.key) {
+        // For sessions without keys (shouldn't happen after our fix, but handle it)
+        sessionMap.set(s.id, s);
+      }
+    });
+    
+    return Array.from(sessionMap.values());
+  }, [sessions, recentActivitySessions]);
+
+  const runningCount = allDisplayedSessions.filter(s => s.status === 'running').length;
+  const activeCount = allDisplayedSessions.filter(s => s.status === 'active').length;
+  const idleCount = allDisplayedSessions.filter(s => s.status === 'idle').length;
   const idleSessionsCount = activeCount + idleCount; // Matches "Idle Sessions" section
 
   // Filter sessions for display
@@ -236,7 +261,7 @@ export default function TaskManagerOverview() {
             />
             <StatCard 
               label="Total Sessions"
-              value={sessions.length}
+              value={allDisplayedSessions.length}
               icon={ChartBarIcon}
               color="blue"
             />
@@ -256,15 +281,13 @@ export default function TaskManagerOverview() {
             />
           </div>
 
-          {/* Running Sessions — only shown when sessions are running */}
-          {runningSessions.length > 0 && (
-            <SessionList 
-              sessions={runningSessions}
-              title="Running Sessions"
-              emptyMessage="No running sessions"
-              onSessionClick={handleSessionClick}
-            />
-          )}
+          {/* Running Sessions — always shown, displays empty state when no sessions */}
+          <SessionList 
+            sessions={runningSessions}
+            title="Running Sessions"
+            emptyMessage="No running sessions"
+            onSessionClick={handleSessionClick}
+          />
 
           {/* Recent Activity — cron and heartbeat job runs */}
           {jobsLoaded && recentActivitySessions.length > 0 && (
