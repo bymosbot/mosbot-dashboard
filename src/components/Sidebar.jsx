@@ -17,6 +17,7 @@ import {
   DocumentTextIcon,
   CalendarDaysIcon,
   CubeIcon,
+  MegaphoneIcon,
 } from '@heroicons/react/24/outline';
 import { classNames } from '../utils/helpers';
 import { useAuthStore } from '../stores/authStore';
@@ -42,6 +43,7 @@ export default function Sidebar({ onCloseMobile }) {
   const navigation = [
     { name: 'Task Manager', href: '/task-manager', icon: ChartPieIcon },
     { name: 'Kanban', href: '/kanban', icon: RectangleGroupIcon },
+    { name: 'Standup', href: '/standup', icon: MegaphoneIcon },
     { name: 'Org Chart', href: '/org-chart', icon: ChartBarIcon },
     { name: 'Subagents', href: '/subagents', icon: CpuChipIcon },
     { name: 'Scheduler', href: '/scheduler', icon: CalendarDaysIcon },

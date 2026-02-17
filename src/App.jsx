@@ -17,6 +17,7 @@ import Archived from './pages/Archived';
 import Settings from './pages/Settings';
 import ModelFleetSettings from './pages/ModelFleetSettings';
 import TaskView from './pages/TaskView';
+import Standup from './pages/Standup';
 import { useAuthStore } from './stores/authStore';
 import { useAgentStore } from './stores/agentStore';
 
@@ -63,6 +64,7 @@ function App() {
             <Route path="/subagents" element={<Layout><Subagents /></Layout>} />
             <Route path="/scheduler" element={<Layout><CronJobs /></Layout>} />
             <Route path="/cron-jobs" element={<Navigate to="/scheduler" replace />} />
+            <Route path="/standup" element={<Layout><Standup /></Layout>} />
             <Route path="/log" element={<Layout><Log /></Layout>} />
             <Route path="/archived" element={<Layout><Archived /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />

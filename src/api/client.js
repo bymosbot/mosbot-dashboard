@@ -234,4 +234,22 @@ export const getSessionMessages = async (sessionKey, { limit = 50, includeTools 
   return response.data.data;
 };
 
+// Standups API
+export const getStandups = async ({ limit = 50, offset = 0 } = {}) => {
+  const response = await api.get('/standups', {
+    params: { limit, offset }
+  });
+  return response.data;
+};
+
+export const getLatestStandup = async () => {
+  const response = await api.get('/standups/latest');
+  return response.data.data;
+};
+
+export const getStandupById = async (id) => {
+  const response = await api.get(`/standups/${id}`);
+  return response.data.data;
+};
+
 export default api;
