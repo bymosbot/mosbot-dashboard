@@ -5,14 +5,25 @@ import {
   ChartBarIcon, 
   CurrencyDollarIcon,
   CircleStackIcon,
+  FunnelIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
 import StatCard from '../components/StatCard';
 import SessionList from '../components/SessionList';
 import SessionDetailPanel from '../components/SessionDetailPanel';
 import { useBotStore } from '../stores/botStore';
+import { useAgentStore } from '../stores/agentStore';
 import { getCronJobs } from '../api/client';
 import logger from '../utils/logger';
+import { classNames } from '../utils/helpers';
+
+const SESSION_TYPES = [
+  { id: 'main', label: 'Main' },
+  { id: 'subagent', label: 'Subagent' },
+  { id: 'cron', label: 'Cron' },
+  { id: 'heartbeat', label: 'Heartbeat' },
+];
 
 export default function TaskManagerOverview() {
   // Sessions come from the global store (single poller in GlobalSessionPoller)
@@ -21,9 +32,13 @@ export default function TaskManagerOverview() {
   const sessionsError = useBotStore((state) => state.sessionsError);
   const fetchSessions = useBotStore((state) => state.fetchSessions);
   const dailyCost = useBotStore((state) => state.dailyCost);
+  const agents = useAgentStore((state) => state.agents).filter((a) => a.id !== 'archived');
 
   const [selectedSession, setSelectedSession] = useState(null);
   const [activeTab, setActiveTab] = useState('live');
+  const [filterTypes, setFilterTypes] = useState([]);
+  const [filterAgents, setFilterAgents] = useState([]);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Recent cron/heartbeat activity
   const [recentJobs, setRecentJobs] = useState([]);
@@ -179,43 +194,59 @@ export default function TaskManagerOverview() {
     setSelectedSession(null);
   }, []);
 
-  // Calculate session KPIs
-  // Include both OpenClaw sessions AND recent activity sessions (cron/heartbeat)
-  // to ensure KPIs match what's displayed on the page
-  const allDisplayedSessions = useMemo(() => {
-    // Combine sessions and recentActivitySessions, deduplicating by key
-    const sessionMap = new Map();
-    
-    // Add OpenClaw sessions first
-    sessions.forEach(s => {
-      if (s.key) sessionMap.set(s.key, s);
-    });
-    
-    // Add recent activity sessions (won't overwrite if key already exists)
-    recentActivitySessions.forEach(s => {
-      if (s.key && !sessionMap.has(s.key)) {
-        sessionMap.set(s.key, s);
-      } else if (!s.key) {
-        // For sessions without keys (shouldn't happen after our fix, but handle it)
-        sessionMap.set(s.id, s);
-      }
-    });
-    
-    return Array.from(sessionMap.values());
-  }, [sessions, recentActivitySessions]);
-
-  const runningCount = allDisplayedSessions.filter(s => s.status === 'running').length;
-  const activeCount = allDisplayedSessions.filter(s => s.status === 'active').length;
-  const idleCount = allDisplayedSessions.filter(s => s.status === 'idle').length;
-  const idleSessionsCount = activeCount + idleCount; // Matches "Idle Sessions" section
+  // Filter helper: session passes if (no type filter OR kind matches) AND (no agent filter OR agent matches)
+  const passesFilters = useCallback((session) => {
+    const sessionKind = session.kind || 'main';
+    const sessionAgent = session.agent || session.agentId || null;
+    const typeMatch = filterTypes.length === 0 || filterTypes.includes(sessionKind);
+    const agentMatch =
+      filterAgents.length === 0 ||
+      (sessionAgent && filterAgents.includes(sessionAgent)) ||
+      (sessionAgent === 'main' && filterAgents.includes('main'));
+    return typeMatch && agentMatch;
+  }, [filterTypes, filterAgents]);
 
   // Filter sessions for display
   // "Running" = actively processing (updated within 2 min)
   // "Active" = recently used (updated within 30 min)
   // "Idle" = not recently active (updated >30 min ago)
-  const runningSessions = sessions.filter(s => s.status === 'running');
-  const activeSessions = sessions.filter(s => s.status === 'active');
-  const idleSessions = sessions.filter(s => s.status === 'idle');
+  const runningSessions = useMemo(
+    () => sessions.filter((s) => s.status === 'running' && passesFilters(s)),
+    [sessions, passesFilters]
+  );
+  const activeSessions = useMemo(
+    () => sessions.filter((s) => s.status === 'active' && passesFilters(s)),
+    [sessions, passesFilters]
+  );
+  const idleSessions = useMemo(
+    () => sessions.filter((s) => s.status === 'idle' && passesFilters(s)),
+    [sessions, passesFilters]
+  );
+  const filteredRecentActivitySessions = useMemo(
+    () => recentActivitySessions.filter(passesFilters),
+    [recentActivitySessions, passesFilters]
+  );
+
+  const runningCount = runningSessions.length;
+  const activeCount = activeSessions.length;
+  const idleCount = idleSessions.length;
+  const idleSessionsCount = activeCount + idleCount;
+
+  // KPIs: use filtered counts for display consistency
+  const allDisplayedSessionsFiltered = useMemo(() => {
+    const sessionMap = new Map();
+    [runningSessions, activeSessions, idleSessions].forEach((list) =>
+      list.forEach((s) => {
+        if (s.key) sessionMap.set(s.key, s);
+        else if (s.id) sessionMap.set(s.id, s);
+      })
+    );
+    filteredRecentActivitySessions.forEach((s) => {
+      if (s.key && !sessionMap.has(s.key)) sessionMap.set(s.key, s);
+      else if (!sessionMap.has(s.id)) sessionMap.set(s.id, s);
+    });
+    return Array.from(sessionMap.values());
+  }, [runningSessions, activeSessions, idleSessions, filteredRecentActivitySessions]);
 
   if (!sessionsLoaded && sessions.length === 0) {
     return (
@@ -266,7 +297,7 @@ export default function TaskManagerOverview() {
             />
             <StatCard 
               label="All Sessions"
-              value={allDisplayedSessions.length}
+              value={allDisplayedSessionsFiltered.length}
               icon={ChartBarIcon}
               color="blue"
             />
@@ -284,6 +315,115 @@ export default function TaskManagerOverview() {
               icon={CurrencyDollarIcon}
               color="primary"
             />
+          </div>
+
+          {/* Multi-filter: by type and agent */}
+          <div className="bg-dark-900 border border-dark-800 rounded-lg p-4">
+            <button
+              type="button"
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="flex items-center gap-2 text-sm font-medium text-dark-200 hover:text-dark-100 w-full"
+            >
+              <FunnelIcon className="w-5 h-5 text-dark-500" />
+              Filters
+              {(filterTypes.length > 0 || filterAgents.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-primary-500/20 text-primary-400">
+                  {filterTypes.length + filterAgents.length} active
+                </span>
+              )}
+            </button>
+            {filtersExpanded && (
+              <div className="mt-4 space-y-4 pt-4 border-t border-dark-800">
+                {/* Type filter */}
+                <div>
+                  <p className="text-xs font-medium text-dark-500 uppercase tracking-wider mb-2">Type</p>
+                  <div className="flex flex-wrap gap-2">
+                    {SESSION_TYPES.map(({ id, label }) => {
+                      const isSelected = filterTypes.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() =>
+                            setFilterTypes((prev) =>
+                              isSelected ? prev.filter((t) => t !== id) : [...prev, id]
+                            )
+                          }
+                          className={classNames(
+                            "px-3 py-1.5 text-sm font-medium rounded-full border transition-colors",
+                            isSelected
+                              ? "bg-primary-500/20 text-primary-400 border-primary-500/40"
+                              : "bg-dark-800 text-dark-400 border-dark-700 hover:border-dark-600"
+                          )}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* Agent filter */}
+                <div>
+                  <p className="text-xs font-medium text-dark-500 uppercase tracking-wider mb-2">Agent</p>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Include "main" for legacy main-agent sessions */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilterAgents((prev) =>
+                          prev.includes("main")
+                            ? prev.filter((a) => a !== "main")
+                            : [...prev, "main"]
+                        )
+                      }
+                      className={classNames(
+                        "px-3 py-1.5 text-sm font-medium rounded-full border transition-colors",
+                        filterAgents.includes("main")
+                          ? "bg-primary-500/20 text-primary-400 border-primary-500/40"
+                          : "bg-dark-800 text-dark-400 border-dark-700 hover:border-dark-600"
+                      )}
+                    >
+                      Main
+                    </button>
+                    {agents.map((agent) => {
+                      const isSelected = filterAgents.includes(agent.id);
+                      return (
+                        <button
+                          key={agent.id}
+                          type="button"
+                          onClick={() =>
+                            setFilterAgents((prev) =>
+                              isSelected ? prev.filter((a) => a !== agent.id) : [...prev, agent.id]
+                            )
+                          }
+                          className={classNames(
+                            "px-3 py-1.5 text-sm font-medium rounded-full border transition-colors",
+                            isSelected
+                              ? "bg-primary-500/20 text-primary-400 border-primary-500/40"
+                              : "bg-dark-800 text-dark-400 border-dark-700 hover:border-dark-600"
+                          )}
+                        >
+                          {agent.name || agent.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {(filterTypes.length > 0 || filterAgents.length > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterTypes([]);
+                      setFilterAgents([]);
+                    }}
+                    className="flex items-center gap-1.5 text-sm text-dark-500 hover:text-dark-200"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tab bar */}
@@ -312,9 +452,9 @@ export default function TaskManagerOverview() {
               }`}
             >
               Recent Activity
-              {recentActivitySessions.length > 0 && (
+              {filteredRecentActivitySessions.length > 0 && (
                 <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-dark-700 text-dark-400">
-                  {recentActivitySessions.length}
+                  {filteredRecentActivitySessions.length}
                 </span>
               )}
             </button>
@@ -326,13 +466,21 @@ export default function TaskManagerOverview() {
               <SessionList
                 sessions={runningSessions}
                 title="Running Sessions"
-                emptyMessage="No running sessions"
+                emptyMessage={
+                  filterTypes.length > 0 || filterAgents.length > 0
+                    ? "No running sessions match the current filters"
+                    : "No running sessions"
+                }
                 onSessionClick={handleSessionClick}
               />
               <SessionList
                 sessions={[...activeSessions, ...idleSessions]}
                 title="Idle Sessions"
-                emptyMessage="No idle sessions"
+                emptyMessage={
+                  filterTypes.length > 0 || filterAgents.length > 0
+                    ? "No idle sessions match the current filters"
+                    : "No idle sessions"
+                }
                 onSessionClick={handleSessionClick}
                 displayActiveAsIdle
               />
@@ -350,9 +498,13 @@ export default function TaskManagerOverview() {
                 </div>
               ) : (
                 <SessionList
-                  sessions={recentActivitySessions}
+                  sessions={filteredRecentActivitySessions}
                   title="Recent Activity"
-                  emptyMessage="No recent cron or heartbeat activity"
+                  emptyMessage={
+                    filterTypes.length > 0 || filterAgents.length > 0
+                      ? "No recent activity matches the current filters"
+                      : "No recent cron or heartbeat activity"
+                  }
                   onSessionClick={handleSessionClick}
                   displayActiveAsIdle
                 />
