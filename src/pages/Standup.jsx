@@ -307,9 +307,10 @@ function StandupNotesDrawer({ isOpen, onClose, standup }) {
 }
 
 function StandupDetail({ standup, onBack }) {
+  const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
+
   if (!standup) return null;
 
-  const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
   const messages = (standup.messages || []).filter((m) => m.kind === 'agent');
 
   return (

@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useToastStore } from '../stores/toastStore';
-import { useAuthStore } from '../stores/authStore';
 import { api } from '../api/client';
 import { AVAILABLE_MODELS, DEFAULT_PRIMARY_MODEL, DEFAULT_HEARTBEAT_MODEL } from '../constants/models';
 import logger from '../utils/logger';
 
 export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null, mode = 'edit' }) {
   const { showToast } = useToastStore();
-  const { user } = useAuthStore();
   const isCreateMode = mode === 'create' || !agentId;
   
   const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +50,7 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
       }
       loadAvailableLeaders();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadAgentData, loadAvailableLeaders, resetForm are stable; isCreateMode derived from agentId
   }, [isOpen, agentId, isCreateMode]);
   
   const resetForm = () => {

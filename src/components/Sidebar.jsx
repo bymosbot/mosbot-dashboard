@@ -11,7 +11,6 @@ import {
   ChevronRightIcon,
   ArrowRightOnRectangleIcon,
   UserIcon,
-  CpuChipIcon,
   RectangleGroupIcon,
   ChartPieIcon,
   DocumentTextIcon,
