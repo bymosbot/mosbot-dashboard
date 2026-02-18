@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
   XMarkIcon,
@@ -15,6 +15,7 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
   const [sessionMetadata, setSessionMetadata] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const scrollContainerRef = useRef(null);
 
   const getAgentById = useAgentStore((state) => state.getAgentById);
   const agent = session?.agent ? getAgentById(session.agent) : null;
@@ -26,6 +27,16 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadMessages depends on session, which is in deps
   }, [isOpen, session?.key]);
+
+  // Scroll to bottom to show the last message when messages finish loading
+  useEffect(() => {
+    if (!isLoading && !error && messages.length > 0 && scrollContainerRef.current) {
+      const el = scrollContainerRef.current;
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }
+  }, [isLoading, error, messages.length]);
 
   const loadMessages = async () => {
     setIsLoading(true);
@@ -221,7 +232,7 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 overflow-y-auto px-6 py-6">
+                    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 py-6">
                       {isLoading && (
                         <div className="flex items-center justify-center py-12">
                           <div className="text-center">
