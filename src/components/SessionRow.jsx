@@ -119,7 +119,7 @@ export default function SessionRow({ session, onClick, statusDisplay }) {
               {session.agent && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-dark-500">Agent:</span>
-                  <span className="text-dark-200 font-medium">{agent?.name || session.agent}</span>
+                  <span className="text-dark-200 font-medium">{session.agentName || agent?.name || session.agent}</span>
                 </div>
               )}
               {session.model && (

@@ -298,7 +298,7 @@ function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, onTrigger, onJobCl
               <>
                 <span className="text-dark-600">•</span>
                 <span className="text-dark-500">Agent:</span>
-                <span className="text-primary-400 font-medium">{agent?.name || agentId}</span>
+                <span className="text-primary-400 font-medium">{job.agentName || agent?.name || agentId}</span>
               </>
             )}
             {displayModel && (

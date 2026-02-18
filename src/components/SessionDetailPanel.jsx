@@ -161,7 +161,7 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
                             {agent?.icon ? (
                               <div
                                 className="w-6 h-6 rounded-full bg-dark-700 flex items-center justify-center text-base"
-                                title={agent.name || session?.agent}
+                                title={session?.agentName || agent?.name || session?.agent}
                               >
                                 {agent.icon}
                               </div>
@@ -179,7 +179,7 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
                                   <div className="flex items-center gap-1.5 text-sm">
                                     <span className="text-dark-500">Agent:</span>
                                     <span className="text-dark-200 font-medium">
-                                      {agent?.name || session.agent}
+                                      {session.agentName || agent?.name || session.agent}
                                     </span>
                                   </div>
                                 )}

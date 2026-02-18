@@ -62,7 +62,7 @@ export default function Sidebar({ onCloseMobile }) {
     { name: 'Kanban', href: '/kanban', icon: RectangleGroupIcon },
     { name: 'Standups', href: '/standups', icon: MegaphoneIcon },
     { name: 'Org Chart', href: '/org-chart', icon: ChartBarIcon },
-    { name: 'Subagents', href: '/subagents', icon: CpuChipIcon },
+    // { name: 'Subagents', href: '/subagents', icon: CpuChipIcon }, // Hidden: Task Manager + Org Chart cover this
     { name: 'Scheduler', href: '/scheduler', icon: CalendarDaysIcon },
     { name: 'Workspaces', href: `/workspaces/${getDefaultAgent()?.id || 'coo'}`, icon: FolderIcon },
     { name: 'Docs', href: '/docs', icon: DocumentTextIcon },

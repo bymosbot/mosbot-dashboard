@@ -6,8 +6,6 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import { useAgentStore } from "../stores/agentStore";
-
 function formatSchedule(schedule, job) {
   if (!schedule && !job) return "Unknown";
 
@@ -146,7 +144,6 @@ function getStatusBadge(status, enabled, nextRunAt, lastRunAt) {
 }
 
 function CronJobRow({ job }) {
-  const getAgentById = useAgentStore((state) => state.getAgentById);
   const badge = getStatusBadge(job.status, job.enabled, job.nextRunAt, job.lastRunAt);
   const BadgeIcon = badge.icon;
   const isHeartbeat = job.source === "config" || job.payload?.kind === "heartbeat";
@@ -159,7 +156,6 @@ function CronJobRow({ job }) {
   const deliveryMode = job.delivery?.mode || "none";
   const deliveryChannel = job.delivery?.channel || null;
   const agentId = job.agentId || null;
-  const agent = agentId ? getAgentById(agentId) : null;
   const model = job.payload?.model || null;
 
   // Icon: use agent emoji for heartbeats, calendar icon for gateway jobs
@@ -273,7 +269,7 @@ function CronJobRow({ job }) {
               <div className="flex items-center gap-1.5">
                 <span className="text-dark-500">Agent:</span>
                 <span className="text-dark-200 font-medium">
-                  {agent?.name || agentId}
+                  {job.agentName || agentId}
                 </span>
               </div>
             </>
