@@ -139,14 +139,17 @@ function StandupCard({ standup, onClick, isActive }) {
         </div>
       </div>
 
-      {participants.length > 0 && (
+          {participants.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          {participants.map((p, idx) => (
-            <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-dark-700 rounded text-xs">
-              <AgentAvatar agentId={p.agent_id} userName={p.user_name} avatarUrl={p.avatar_url} size="sm" />
-              <span className="text-dark-300 font-medium">{p.user_name || p.agent_id}</span>
-            </div>
-          ))}
+          {participants.map((p, idx) => {
+            const pName = p.user_name || p.agent_id;
+            return (
+              <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-dark-700 rounded text-xs">
+                <AgentAvatar agentId={p.agent_id} userName={pName} avatarUrl={p.avatar_url} size="sm" />
+                <span className="text-dark-300 font-medium">{pName}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -253,7 +256,10 @@ function StandupNotesDrawer({ isOpen, onClose, standup }) {
                       ) : (
                         <div className="space-y-6">
                           {entries.map((entry) => {
-                            const displayName = entry.user_name || entry.agent_id;
+                            const entryName = entry.user_name || entry.agent_id;
+                            const displayName = entry.agent_title
+                              ? `${entryName} (${entry.agent_title})`
+                              : entryName;
                             const showStructured = hasStructuredEntry(entry);
                             const fallbackContent = entry.raw;
 
@@ -262,7 +268,7 @@ function StandupNotesDrawer({ isOpen, onClose, standup }) {
                                 <div className="flex items-center gap-2 mb-3">
                                   <AgentAvatar
                                     agentId={entry.agent_id}
-                                    userName={displayName}
+                                    userName={entryName}
                                     avatarUrl={entry.avatar_url || null}
                                     size="sm"
                                   />
@@ -374,14 +380,17 @@ function StandupDetail({ standup, onBack }) {
         ) : (
           messages.map((message) => {
             const agentEntry = standup.entries?.find((e) => e.agent_id === message.agent_id);
-            const displayName = agentEntry?.user_name || message.agent_id;
+            const agentName = agentEntry?.user_name || message.agent_id;
+            const displayName = agentEntry?.agent_title
+              ? `${agentName} (${agentEntry.agent_title})`
+              : agentName;
             const avatarUrl = agentEntry?.avatar_url || null;
 
             return (
               <div key={message.id} className="flex gap-3">
                 <AgentAvatar
                   agentId={message.agent_id}
-                  userName={displayName}
+                  userName={agentName}
                   avatarUrl={avatarUrl}
                 />
                 <div className="flex-1 min-w-0">
