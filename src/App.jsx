@@ -10,6 +10,8 @@ import KanbanPage from './pages/KanbanPage';
 import OrgChart from './pages/OrgChart';
 import Workspace from './pages/Workspace';
 import Docs from './pages/Docs';
+import Projects from './pages/Projects';
+import Skills from './pages/Skills';
 // import Subagents from './pages/Subagents'; // Hidden: Task Manager + Org Chart cover this; re-enable if needed
 import CronJobs from './pages/CronJobs';
 import Log from './pages/Log';
@@ -61,6 +63,8 @@ function App() {
             <Route path="/tasks/kanban" element={<Navigate to="/tasks" replace />} />
             <Route path="/tasks/org-chart" element={<Navigate to="/org-chart" replace />} />
             <Route path="/docs/*" element={<Layout><Docs /></Layout>} />
+            <Route path="/projects/*" element={<Layout><Projects /></Layout>} />
+            <Route path="/skills/*" element={<Layout><Skills /></Layout>} />
             <Route path="/workspaces" element={<Navigate to={`/workspaces/${getDefaultAgent()?.id || 'coo'}`} replace />} />
             <Route path="/workspaces/:agentId/*" element={<Layout><Workspace /></Layout>} />
             {/* <Route path="/subagents" element={<Layout><Subagents /></Layout>} /> */}

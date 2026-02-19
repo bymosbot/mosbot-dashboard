@@ -48,7 +48,8 @@ export default function WorkspaceExplorer({
   initialFilePath = null,
   routeBase = null, // If null, defaults to `/workspaces/${agentId}`
   showAgentSelector = true,
-  workspaceRootPath: workspaceRootPathOverride = null
+  workspaceRootPath: workspaceRootPathOverride = null,
+  leftPaneTop = null, // Optional slot rendered above the file tree in the left pane
 }) {
   const navigate = useNavigate();
   const { agents } = useAgentStore();
@@ -692,8 +693,14 @@ export default function WorkspaceExplorer({
       
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left pane: File browser */}
-        <div className="w-80 border-r border-dark-800 overflow-y-auto">
+        {/* Left pane: optional top slot + file browser */}
+        <div className="w-80 border-r border-dark-800 flex flex-col overflow-hidden">
+          {leftPaneTop && (
+            <div className="flex-shrink-0 border-b border-dark-800 overflow-y-auto" style={{ maxHeight: '40%' }}>
+              {leftPaneTop}
+            </div>
+          )}
+          <div className={leftPaneTop ? 'flex-1 overflow-y-auto' : 'overflow-y-auto h-full'}>
           {isLoadingListing && !currentListing ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-3">
@@ -792,6 +799,7 @@ export default function WorkspaceExplorer({
               )}
             </div>
           )}
+          </div>
         </div>
         
         {/* Right pane: File preview */}

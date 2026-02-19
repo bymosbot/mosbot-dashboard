@@ -4,6 +4,7 @@ import { Menu, Transition } from '@headlessui/react';
 import {
   ChartBarIcon,
   FolderIcon,
+  FolderOpenIcon,
   ClipboardDocumentListIcon,
   ArchiveBoxIcon,
   Cog6ToothIcon,
@@ -17,6 +18,7 @@ import {
   CalendarDaysIcon,
   CubeIcon,
   MegaphoneIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { classNames } from '../utils/helpers';
 import { useAuthStore } from '../stores/authStore';
@@ -69,6 +71,8 @@ export default function Sidebar({ onCloseMobile }) {
       items: [
         { name: 'Org Chart', href: '/org-chart', icon: ChartBarIcon },
         { name: 'Workspaces', href: `/workspaces/${getDefaultAgent()?.id || 'coo'}`, icon: FolderIcon },
+        { name: 'Projects', href: '/projects', icon: FolderOpenIcon },
+        { name: 'Skills', href: '/skills', icon: SparklesIcon },
       ],
     },
     {
@@ -134,15 +138,14 @@ export default function Sidebar({ onCloseMobile }) {
             <div className="space-y-1">
               {group.items.map((item) => {
                 const hasSubpages = item.subpages && item.subpages.length > 0;
+                const prefixRoutes = ['/workspaces', '/docs', '/projects', '/skills'];
                 const isActive = hasSubpages
                   ? location.pathname === item.href
-                  : item.href === '/workspaces'
-                    ? location.pathname.startsWith('/workspaces')
-                    : item.href === '/docs'
-                      ? location.pathname.startsWith('/docs')
-                      : item.href === '/tasks'
-                        ? location.pathname === '/tasks'
-                        : location.pathname === item.href;
+                  : prefixRoutes.includes(item.href)
+                    ? location.pathname.startsWith(item.href)
+                    : item.href === '/tasks'
+                      ? location.pathname === '/tasks'
+                      : location.pathname === item.href;
                 const isExpanded = expandedItems[item.name] || (item.subpages && item.subpages.some(sub => location.pathname === sub.href));
 
                 return (

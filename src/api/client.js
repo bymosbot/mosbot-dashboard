@@ -173,7 +173,8 @@ export const getActiveSubagentSessions = async () => {
 // OpenClaw Cron Jobs API - get configured scheduled jobs from OpenClaw
 export const getCronJobs = async () => {
   const response = await api.get("/openclaw/cron-jobs", { timeout: OPENCLAW_TIMEOUT });
-  return response.data.data;
+  // Response shape: { data: { version: number, jobs: CronJob[] } }
+  return response.data.data?.jobs ?? response.data.data ?? [];
 };
 
 export const getSchedulerStats = async () => {
@@ -187,9 +188,9 @@ export const createCronJob = async (payload) => {
   return response.data.data;
 };
 
-// Update an existing cron job (admin only)
+// Update an existing cron job (admin only) — PATCH for partial updates
 export const updateCronJob = async (jobId, payload) => {
-  const response = await api.put(`/openclaw/cron-jobs/${jobId}`, payload);
+  const response = await api.patch(`/openclaw/cron-jobs/${jobId}`, payload);
   return response.data.data;
 };
 
@@ -206,8 +207,8 @@ export const setCronJobEnabled = async (jobId, enabled) => {
 
 // Manually trigger a cron job to run now (admin only)
 export const triggerCronJob = async (jobId) => {
-  const response = await api.post(`/openclaw/cron-jobs/${jobId}/trigger`);
-  return response.data;
+  const response = await api.post(`/openclaw/cron-jobs/${jobId}/run`);
+  return response.data.data;
 };
 
 // Task-scoped subagents API

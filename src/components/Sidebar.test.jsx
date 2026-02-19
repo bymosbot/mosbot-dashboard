@@ -225,6 +225,8 @@ describe('Sidebar', () => {
 
       expect(screen.getByText('Agent Monitor')).toBeInTheDocument();
       expect(screen.getByText('Workspaces')).toBeInTheDocument();
+      expect(screen.getByText('Projects')).toBeInTheDocument();
+      expect(screen.getByText('Skills')).toBeInTheDocument();
       expect(screen.getByText('Log')).toBeInTheDocument();
       expect(screen.getByText('Settings')).toBeInTheDocument();
       expect(screen.getByText('Archived')).toBeInTheDocument();

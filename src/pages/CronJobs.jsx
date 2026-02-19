@@ -5,6 +5,7 @@ import {
   XMarkIcon,
   PencilIcon,
   TrashIcon,
+  ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
 import Header from "../components/Header";
 import MarkdownRenderer from "../components/MarkdownRenderer";
@@ -111,7 +112,15 @@ function formatModel(model) {
   return modelPart;
 }
 
-function getStatusBadge(status, enabled, nextRunAt, lastRunAt) {
+// Accept both ms-epoch integers and ISO strings for backwards compat with heartbeat jobs
+function toMs(value) {
+  if (!value) return null;
+  if (typeof value === 'number') return value;
+  const ms = new Date(value).getTime();
+  return isNaN(ms) ? null : ms;
+}
+
+function getStatusBadge(lastStatus, enabled, nextRunAtMs, lastRunAtMs) {
   if (enabled === false) {
     return {
       classes: 'bg-dark-600/10 text-dark-400 border-dark-600/20',
@@ -119,25 +128,21 @@ function getStatusBadge(status, enabled, nextRunAt, lastRunAt) {
       label: 'disabled',
     };
   }
-  if (enabled !== false && !nextRunAt && !lastRunAt) {
+  if (enabled !== false && !nextRunAtMs && !lastRunAtMs) {
     return {
       classes: 'bg-yellow-600/10 text-yellow-500 border-yellow-500/20',
       icon: ExclamationTriangleIcon,
       label: 'not scheduled',
     };
   }
-  if (enabled !== false && nextRunAt) {
-    const nextRunDate = new Date(nextRunAt);
-    const now = new Date();
-    if (nextRunDate < now) {
-      return {
-        classes: 'bg-yellow-600/10 text-yellow-500 border-yellow-500/20',
-        icon: ExclamationTriangleIcon,
-        label: 'missed',
-      };
-    }
+  if (enabled !== false && nextRunAtMs && nextRunAtMs < Date.now()) {
+    return {
+      classes: 'bg-yellow-600/10 text-yellow-500 border-yellow-500/20',
+      icon: ExclamationTriangleIcon,
+      label: 'missed',
+    };
   }
-  if (status === 'error') {
+  if (lastStatus === 'error') {
     return {
       classes: 'bg-red-600/10 text-red-500 border-red-500/20',
       icon: ExclamationTriangleIcon,
@@ -153,7 +158,13 @@ function getStatusBadge(status, enabled, nextRunAt, lastRunAt) {
 
 function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, onTrigger, onJobClick, agents }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const badge = getStatusBadge(job.status, job.enabled, job.nextRunAt, job.lastRunAt);
+
+  // Prefer ms-epoch fields from state object; fall back to legacy top-level ISO strings
+  const nextRunAtMs = toMs(job.state?.nextRunAtMs ?? job.nextRunAt);
+  const lastRunAtMs = toMs(job.state?.lastRunAtMs ?? job.lastRunAt);
+  const lastStatus = job.state?.lastStatus ?? job.status ?? null;
+
+  const badge = getStatusBadge(lastStatus, job.enabled, nextRunAtMs, lastRunAtMs);
   const BadgeIcon = badge.icon;
   const isHeartbeat = job.source === 'config' || job.payload?.kind === 'heartbeat';
 
@@ -316,24 +327,24 @@ function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, onTrigger, onJobCl
           </div>
 
           {/* Next/Last run timing */}
-          {((job.enabled !== false && job.nextRunAt) || job.lastRunAt) && (
+          {((job.enabled !== false && nextRunAtMs) || lastRunAtMs) && (
             <div className="flex items-center gap-3 mt-1.5 text-xs flex-wrap">
-              {job.enabled !== false && job.nextRunAt && (
+              {job.enabled !== false && nextRunAtMs && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-dark-500 font-medium uppercase tracking-wide">
                     {badge.label === 'missed' ? 'Missed' : 'Next'}
                   </span>
                   <span className={badge.label === 'missed' ? 'text-yellow-400 font-medium' : 'text-dark-300'}>
-                    {formatRelativeTime(job.nextRunAt)}
+                    {formatRelativeTime(nextRunAtMs)}
                   </span>
                 </div>
               )}
-              {job.lastRunAt && (
+              {lastRunAtMs && (
                 <>
-                  {job.enabled !== false && job.nextRunAt && <span className="text-dark-600">•</span>}
+                  {job.enabled !== false && nextRunAtMs && <span className="text-dark-600">•</span>}
                   <div className="flex items-center gap-1.5">
                     <span className="text-dark-500 font-medium uppercase tracking-wide">Last</span>
-                    <span className="text-dark-300">{formatRelativeTime(job.lastRunAt)}</span>
+                    <span className="text-dark-300">{formatRelativeTime(lastRunAtMs)}</span>
                   </div>
                 </>
               )}
@@ -387,6 +398,15 @@ function CronJobRow({ job, onEdit, onDelete, onToggleEnabled, onTrigger, onJobCl
       </div>
     </div>
   );
+}
+
+// Mirrors the server-side slugifyJobId — used for the live preview only
+function slugifyJobId(name) {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
 }
 
 // Helper function to parse common cron expressions
@@ -448,17 +468,19 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
     everyUnit: 'm',
     prompt: '',
     agentId: '',
-    model: '', // '' = use agent default, else model id from API
-    sessionTarget: 'main', // 'main' or 'isolated'
+    model: '',
+    sessionTarget: 'isolated', // isolated required for agentTurn (default for new jobs)
+    wakeMode: 'now', // 'now' or 'next-heartbeat'
     deliveryMode: 'announce', // 'announce' or 'none'
     enabled: true,
     // Heartbeat-specific fields
-    target: 'last', // 'last' or other target
-    ackMaxChars: '200', // Max chars for acknowledgment
+    target: 'last',
+    ackMaxChars: '200',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [models, setModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [jobIdCopied, setJobIdCopied] = useState(false);
   const showToast = useToastStore((state) => state.showToast);
 
   // Fetch available models when modal opens (lazy load)
@@ -522,6 +544,7 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
         agentId: job.agentId || '',
         model: job.payload?.model || '',
         sessionTarget: sessionTargetValue,
+        wakeMode: job.wakeMode || 'now',
         deliveryMode: job.delivery?.mode || 'announce',
         enabled: job.enabled !== false,
         target: job.payload?.target || 'last',
@@ -536,32 +559,45 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
         everyInterval: '30',
         everyUnit: 'm',
         prompt: '',
-        agentId: '',
+        agentId: agents.length > 0 ? agents[0].id : '',
         model: '',
-        sessionTarget: 'main',
+        sessionTarget: 'isolated',
+        wakeMode: 'now',
         deliveryMode: 'announce',
         enabled: true,
         target: 'last',
         ackMaxChars: '200',
       });
     }
-  }, [job, isOpen]);
+  }, [job, isOpen, agents]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
 
+    const isHeartbeat = job?.source === 'config' || job?.payload?.kind === 'heartbeat';
+    const isIsolated = formData.sessionTarget === 'isolated';
+
+    // Client-side validation for schema rules
+    if (!isHeartbeat && !formData.agentId) {
+      showToast('Agent is required', 'error');
+      return;
+    }
+    if (!isHeartbeat && isIsolated && !formData.model.trim()) {
+      showToast('AI Model is required for isolated (agentTurn) sessions', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const isHeartbeat = job?.source === 'config' || job?.payload?.kind === 'heartbeat';
-      
       const payload = {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         enabled: formData.enabled,
         agentId: formData.agentId || undefined,
+        wakeMode: formData.wakeMode || 'now',
         schedule: {},
-        sessionTarget: formData.sessionTarget || 'main',
+        sessionTarget: formData.sessionTarget || 'isolated',
         payload: {},
       };
 
@@ -582,7 +618,6 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
       }
 
       if (isHeartbeat) {
-        // Heartbeat-specific payload
         payload.payload.kind = 'heartbeat';
         payload.payload.target = formData.target;
         const ackMaxChars = parseInt(formData.ackMaxChars, 10);
@@ -594,31 +629,20 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
           payload.payload.message = formData.prompt.trim();
         }
         payload.payload.session = formData.sessionTarget;
-      } else {
-        // Gateway cron job — use official OpenClaw payload.kind
-        if (formData.sessionTarget === 'isolated') {
-          payload.payload.kind = 'agentTurn';
-          if (formData.prompt.trim()) {
-            payload.payload.message = formData.prompt.trim();
-          }
-        } else {
-          payload.payload.kind = 'systemEvent';
-          if (formData.prompt.trim()) {
-            payload.payload.text = formData.prompt.trim();
-            payload.payload.message = formData.prompt.trim();
-          }
-        }
-      }
-
-      if (formData.model.trim()) {
+      } else if (isIsolated) {
+        // isolated → agentTurn (schema rule: sessionTarget=isolated required for agentTurn)
+        payload.payload.kind = 'agentTurn';
+        payload.payload.message = formData.prompt.trim();
         payload.payload.model = formData.model.trim();
+      } else {
+        // main → systemEvent
+        payload.payload.kind = 'systemEvent';
+        payload.payload.text = formData.prompt.trim();
       }
 
       // Delivery config
       if (formData.deliveryMode) {
-        payload.delivery = {
-          mode: formData.deliveryMode,
-        };
+        payload.delivery = { mode: formData.deliveryMode };
       }
 
       await onSave(payload);
@@ -710,6 +734,39 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
                       className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                       placeholder="Daily workspace review"
                     />
+                    {/* Job ID — derived preview on create, immutable display on edit */}
+                    {(() => {
+                      const displayId = job ? (job.jobId || job.id) : slugifyJobId(formData.name);
+                      if (!displayId) return null;
+                      return (
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-xs text-dark-500 font-medium shrink-0">
+                            {job ? 'Job ID' : 'Will be assigned ID'}
+                          </span>
+                          <code className="text-xs text-dark-300 font-mono bg-dark-800 border border-dark-700 px-2 py-0.5 rounded flex-1 truncate">
+                            {displayId}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(displayId);
+                              setJobIdCopied(true);
+                              setTimeout(() => setJobIdCopied(false), 1500);
+                            }}
+                            className="p-1 text-dark-500 hover:text-dark-200 transition-colors shrink-0"
+                            title="Copy job ID"
+                          >
+                            {jobIdCopied
+                              ? <span className="text-[10px] text-green-400 font-medium">Copied</span>
+                              : <ClipboardDocumentIcon className="w-3.5 h-3.5" />
+                            }
+                          </button>
+                          {!job && (
+                            <span className="text-[10px] text-dark-600 shrink-0">auto-generated</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div>
@@ -811,14 +868,15 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-dark-300 mb-1">
-                        Agent
+                        Agent *
                       </label>
                       <select
+                        required
                         value={formData.agentId}
                         onChange={(e) => setFormData({ ...formData, agentId: e.target.value })}
                         className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                       >
-                        <option value="">Default (main)</option>
+                        {agents.length === 0 && <option value="">No agents available</option>}
                         {agents.map((agent) => (
                           <option key={agent.id} value={agent.id}>
                             {agent.icon} {agent.name} ({agent.id.toUpperCase()})
@@ -832,7 +890,26 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
 
                     <div>
                       <label className="block text-sm font-medium text-dark-300 mb-1">
-                        AI Model
+                        Session *
+                      </label>
+                      <select
+                        value={formData.sessionTarget}
+                        onChange={(e) => setFormData({ ...formData, sessionTarget: e.target.value })}
+                        className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="isolated">Isolated — fresh context each run (agentTurn)</option>
+                        <option value="main">Main — persistent shared context (systemEvent)</option>
+                      </select>
+                      <p className="text-xs text-dark-500 mt-1">
+                        Isolated: new session per run, requires model. Main: reuses agent&apos;s persistent session
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-dark-300 mb-1">
+                        AI Model {formData.sessionTarget === 'isolated' ? '*' : ''}
                       </label>
                       <select
                         value={formData.model}
@@ -840,10 +917,12 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
                         disabled={loadingModels}
                         className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
                       >
-                        <option value="">Default (use agent model)</option>
+                        {formData.sessionTarget !== 'isolated' && (
+                          <option value="">Default (use agent model)</option>
+                        )}
                         {models.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.name} ({m.id}){m.isDefault ? ' - default' : ''}
+                            {m.name} ({m.id}){m.isDefault ? ' — default' : ''}
                           </option>
                         ))}
                         {formData.model && !models.some((m) => m.id === formData.model) && (
@@ -851,48 +930,45 @@ function CronJobModal({ isOpen, onClose, job, onSave, timezone = 'UTC' }) {
                         )}
                       </select>
                       <p className="text-xs text-dark-500 mt-1">
-                        Optional: override agent&apos;s default model
+                        {formData.sessionTarget === 'isolated'
+                          ? 'Required for isolated sessions'
+                          : 'Optional: override agent\u2019s default model'}
                       </p>
                       {loadingModels && (
                         <p className="text-xs text-dark-500 mt-1">Loading models...</p>
                       )}
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-dark-300 mb-1">
+                        Wake Mode *
+                      </label>
+                      <select
+                        value={formData.wakeMode}
+                        onChange={(e) => setFormData({ ...formData, wakeMode: e.target.value })}
+                        className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="now">Now — run immediately when scheduled</option>
+                        <option value="next-heartbeat">Next heartbeat — wait for agent heartbeat</option>
+                      </select>
+                      <p className="text-xs text-dark-500 mt-1">
+                        Now: fires at the scheduled time. Next heartbeat: defers to the agent&apos;s next heartbeat cycle
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-dark-300 mb-1">
-                        Session
-                      </label>
-                      <select
-                        value={formData.sessionTarget}
-                        onChange={(e) => setFormData({ ...formData, sessionTarget: e.target.value })}
-                        className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="main">Main (shared context)</option>
-                        <option value="isolated">Isolated (fresh context)</option>
-                      </select>
-                      <p className="text-xs text-dark-500 mt-1">
-                        Main: uses agent&apos;s persistent session. Isolated: creates a new session each run
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-dark-300 mb-1">
-                        Delivery
-                      </label>
-                      <select
-                        value={formData.deliveryMode}
-                        onChange={(e) => setFormData({ ...formData, deliveryMode: e.target.value })}
-                        className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="announce">Announce summary (default)</option>
-                        <option value="none">None (internal only)</option>
-                      </select>
-                      <p className="text-xs text-dark-500 mt-1">
-                        Announce: sends summary to configured channels. None: job runs silently without notifications
-                      </p>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-300 mb-1">
+                      Delivery
+                    </label>
+                    <select
+                      value={formData.deliveryMode}
+                      onChange={(e) => setFormData({ ...formData, deliveryMode: e.target.value })}
+                      className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded text-dark-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="announce">Announce — send summary to configured channels</option>
+                      <option value="none">None — run silently without notifications</option>
+                    </select>
                   </div>
 
                   {/* Heartbeat-specific fields */}
@@ -1135,19 +1211,27 @@ export default function CronJobs() {
   const scheduledJobs = filteredJobs.filter(j => j.source === 'gateway');
   const heartbeatJobs = filteredJobs.filter(j => j.source === 'config');
 
-  // Calculate stats
+  // Calculate stats — use ms-epoch fields from state; fall back to legacy ISO strings
   const enabledCount = jobs.filter(j => j.enabled !== false).length;
   const disabledCount = jobs.filter(j => j.enabled === false).length;
-  const now = new Date();
-  const errorCount = jobs.filter(j => j.status === 'error').length;
-  const missedCount = jobs.filter(
-    j => j.enabled !== false && j.nextRunAt && new Date(j.nextRunAt) < now
-  ).length;
+  const nowMs = Date.now();
+  const errorCount = jobs.filter(j => (j.state?.lastStatus ?? j.status) === 'error').length;
+  const missedCount = jobs.filter(j => {
+    const nxt = toMs(j.state?.nextRunAtMs ?? j.nextRunAt);
+    return j.enabled !== false && nxt && nxt < nowMs;
+  }).length;
 
   // Find next upcoming job (only future runs, ignore missed)
   const nextJob = jobs
-    .filter(j => j.enabled !== false && j.nextRunAt && new Date(j.nextRunAt) > now)
-    .sort((a, b) => new Date(a.nextRunAt) - new Date(b.nextRunAt))[0];
+    .filter(j => {
+      const nxt = toMs(j.state?.nextRunAtMs ?? j.nextRunAt);
+      return j.enabled !== false && nxt && nxt > nowMs;
+    })
+    .sort((a, b) => {
+      const aMs = toMs(a.state?.nextRunAtMs ?? a.nextRunAt);
+      const bMs = toMs(b.state?.nextRunAtMs ?? b.nextRunAt);
+      return aMs - bMs;
+    })[0];
 
   // Count jobs per agent
   const agentJobCounts = agents.reduce((acc, agent) => {
@@ -1202,7 +1286,7 @@ export default function CronJobs() {
       contextTokens: job.lastExecution?.contextTokens || 0,
       totalTokensUsed: job.lastExecution?.totalTokensUsed || 0,
       contextUsagePercent: job.lastExecution?.contextUsagePercent || 0,
-      updatedAt: job.lastRunAt ? new Date(job.lastRunAt).getTime() : null,
+      updatedAt: toMs(job.state?.lastRunAtMs ?? job.lastRunAt),
     };
   };
 
@@ -1244,7 +1328,7 @@ export default function CronJobs() {
                 {nextJob ? (
                   <div className="space-y-0.5">
                     <p className="text-sm font-semibold text-dark-200 line-clamp-1">{nextJob.name}</p>
-                    <p className="text-xs text-primary-400 font-medium">{formatRelativeTime(nextJob.nextRunAt)}</p>
+                    <p className="text-xs text-primary-400 font-medium">{formatRelativeTime(toMs(nextJob.state?.nextRunAtMs ?? nextJob.nextRunAt))}</p>
                   </div>
                 ) : (
                   <p className="text-sm text-dark-500">No upcoming jobs</p>
