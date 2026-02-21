@@ -142,6 +142,13 @@ export default function TaskManagerOverview() {
         label: (!isHeartbeat && executionData.sessionLabel) ? executionData.sessionLabel : job.name,
         status,
         kind: isHeartbeat ? 'heartbeat' : 'cron',
+        // sessionTarget may not be returned by cron.list; infer from payload.kind as fallback
+        // (agentTurn jobs are always isolated — enforced by the API)
+        sessionTarget: isHeartbeat ? null : (
+          job.sessionTarget ||
+          job.payload?.session ||
+          (job.payload?.kind === 'agentTurn' ? 'isolated' : 'main')
+        ),
         updatedAt: job.lastRunAt ? new Date(job.lastRunAt).getTime() : null,
         agent: job.agentId || null,
         // For cron: use actual execution model only (avoid showing agent config model as session model)
@@ -557,6 +564,7 @@ export default function TaskManagerOverview() {
         isOpen={!!selectedSession}
         onClose={handleClosePanel}
         session={selectedSession}
+        latestRunOnly
       />
     </div>
   );

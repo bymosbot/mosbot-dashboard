@@ -1298,10 +1298,14 @@ export default function CronJobs() {
 
     const isHeartbeat = job.source === 'config' || job.payload?.kind === 'heartbeat';
     
-    // For gateway cron: use lastExecution.sessionKey
-    // For heartbeat: use agent:${agentId}:main (main session)
+    // For gateway cron: use lastExecution.sessionKey (set by API enrichment)
+    // For heartbeat fallback: API enrichment resolves the correct key, but if
+    // lastExecution is absent we try the v2026.2.19+ isolated key format first,
+    // then fall back to the older :heartbeat key.
     const sessionKey = job.lastExecution?.sessionKey
-      ?? (isHeartbeat && job.agentId ? `agent:${job.agentId}:main` : null);
+      ?? (isHeartbeat && job.agentId
+        ? `agent:${job.agentId}:isolated`
+        : null);
 
     return {
       key: sessionKey,
@@ -1309,9 +1313,18 @@ export default function CronJobs() {
       agent: job.agentId,
       status: job.status || (job.enabled !== false ? 'idle' : 'completed'),
       kind: isHeartbeat ? 'heartbeat' : 'cron',
+      // sessionTarget may not be returned by cron.list; infer from payload.kind as fallback
+      // (agentTurn jobs are always isolated — enforced by the API)
+      sessionTarget: isHeartbeat ? null : (
+        job.sessionTarget ||
+        job.payload?.session ||
+        (job.payload?.kind === 'agentTurn' ? 'isolated' : 'main')
+      ),
       model: job.lastExecution?.model || job.payload?.model || job.agentModel || null,
       inputTokens: job.lastExecution?.inputTokens || 0,
       outputTokens: job.lastExecution?.outputTokens || 0,
+      cacheReadTokens: job.lastExecution?.cacheReadTokens || 0,
+      cacheWriteTokens: job.lastExecution?.cacheWriteTokens || 0,
       messageCost: job.lastExecution?.messageCost || 0,
       contextTokens: job.lastExecution?.contextTokens || 0,
       totalTokensUsed: job.lastExecution?.totalTokensUsed || 0,

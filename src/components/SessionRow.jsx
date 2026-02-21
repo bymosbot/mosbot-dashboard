@@ -285,7 +285,7 @@ export default function SessionRow({ session, onClick, onDelete, statusDisplay }
             </>
           )}
 
-          {/* Context window usage */}
+          {/* Context window usage — cron shows last run's context fill; others show live session context */}
           {session.contextTokens > 0 && (
             <>
               {(session.inputTokens > 0 || session.outputTokens > 0 || session.cacheReadTokens > 0 || session.messageCost > 0) && <span className="text-dark-600">•</span>}

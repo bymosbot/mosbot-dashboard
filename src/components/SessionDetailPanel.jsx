@@ -4,13 +4,140 @@ import {
   XMarkIcon,
   ChatBubbleLeftRightIcon,
   CpuChipIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { useAgentStore } from "../stores/agentStore";
 import { getSessionMessages } from "../api/client";
 import MarkdownRenderer from "./MarkdownRenderer";
 import logger from "../utils/logger";
 
-export default function SessionDetailPanel({ isOpen, onClose, session }) {
+// Gap threshold for detecting a new isolated run boundary
+const RUN_GAP_MS = 5 * 60 * 1000;
+
+/** Groups a flat message array into runs based on timestamp gaps. */
+function groupMessagesIntoRuns(messages) {
+  const runs = [];
+  messages.forEach((message) => {
+    const curTs = message.timestamp ? new Date(message.timestamp).getTime() : null;
+    const lastRun = runs[runs.length - 1];
+    const lastMsg = lastRun?.messages[lastRun.messages.length - 1];
+    const prevTs = lastMsg?.timestamp ? new Date(lastMsg.timestamp).getTime() : null;
+    const isNewRun =
+      runs.length === 0 ||
+      (prevTs !== null && curTs !== null && curTs - prevTs >= RUN_GAP_MS);
+    if (isNewRun) {
+      runs.push({ startTimestamp: message.timestamp, messages: [] });
+    }
+    runs[runs.length - 1].messages.push(message);
+  });
+  return runs;
+}
+
+/** Renders the messages inside a run group. */
+function RunMessages({ messages, getRoleBadgeColor, formatModelName }) {
+  return (
+    <div className="space-y-3">
+      {messages.map((message, idx) => (
+        <div
+          key={idx}
+          className="bg-dark-800/50 border border-dark-700/50 rounded-lg p-4"
+        >
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <span className={`px-2.5 py-1 text-xs font-medium rounded-full border ${getRoleBadgeColor(message.role)}`}>
+                {message.role}
+              </span>
+              {message.model && (
+                <span className="text-xs text-dark-400">{formatModelName(message.model)}</span>
+              )}
+            </div>
+            {message.timestamp && (
+              <span className="text-xs text-dark-400 flex-shrink-0">
+                {new Date(message.timestamp).toLocaleString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true,
+                })}
+              </span>
+            )}
+          </div>
+          {message.content ? (
+            <div className="prose prose-invert prose-sm max-w-none">
+              <MarkdownRenderer content={message.content} />
+            </div>
+          ) : (
+            <p className="text-sm text-dark-500 italic">No content</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Collapsible run group used for isolated cron sessions (Scheduler view). */
+function RunGroup({ run, runNumber, totalRuns, getRoleBadgeColor, formatModelName }) {
+  const isLatest = runNumber === totalRuns;
+  const [isOpen, setIsOpen] = useState(isLatest);
+
+  return (
+    <div className={`rounded-lg border overflow-hidden ${
+      isLatest ? 'border-amber-500/20' : 'border-dark-700/60'
+    }`}>
+      {/* Run header / toggle */}
+      <button
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+          isLatest
+            ? 'bg-amber-500/8 hover:bg-amber-500/12'
+            : 'bg-dark-800/60 hover:bg-dark-800'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          {isOpen
+            ? <ChevronDownIcon className={`w-4 h-4 flex-shrink-0 ${isLatest ? 'text-amber-400' : 'text-dark-500'}`} />
+            : <ChevronRightIcon className={`w-4 h-4 flex-shrink-0 ${isLatest ? 'text-amber-400' : 'text-dark-500'}`} />
+          }
+          <span className={`text-[11px] font-semibold uppercase tracking-wider ${
+            isLatest ? 'text-amber-400' : 'text-dark-400'
+          }`}>
+            {isLatest ? 'Latest Run' : `Run ${runNumber}`}
+          </span>
+          {run.startTimestamp && (
+            <span className={`text-xs font-normal ${isLatest ? 'text-amber-400/60' : 'text-dark-500'}`}>
+              {new Date(run.startTimestamp).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              })}
+            </span>
+          )}
+        </div>
+        <span className={`text-xs flex-shrink-0 ${isLatest ? 'text-amber-400/60' : 'text-dark-500'}`}>
+          {run.messages.length} {run.messages.length === 1 ? 'message' : 'messages'}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="p-3 bg-dark-900/40">
+          <RunMessages
+            messages={run.messages}
+            getRoleBadgeColor={getRoleBadgeColor}
+            formatModelName={formatModelName}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function SessionDetailPanel({ isOpen, onClose, session, latestRunOnly = false }) {
   const [messages, setMessages] = useState([]);
   const [sessionMetadata, setSessionMetadata] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,6 +147,14 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
   const getAgentById = useAgentStore((state) => state.getAgentById);
   const agent = session?.agent ? getAgentById(session.agent) : null;
 
+  // Treat cron and heartbeat sessions as multi-run: both accumulate messages from
+  // multiple isolated runs in the same history stream.
+  // sessionTarget may not be present on sessions coming from the live sessions store.
+  const isGroupedSession = session?.kind === 'cron' || session?.kind === 'heartbeat';
+  const allRuns = isGroupedSession ? groupMessagesIntoRuns(messages) : null;
+  // latestRunOnly: only show the last run's messages (used by Task Manager)
+  const runs = latestRunOnly && allRuns ? allRuns.slice(-1) : allRuns;
+
   // Fetch messages when panel opens
   useEffect(() => {
     if (isOpen && session?.key) {
@@ -28,7 +163,7 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadMessages depends on session, which is in deps
   }, [isOpen, session?.key]);
 
-  // Scroll to bottom to show the last message when messages finish loading
+  // Scroll to bottom when messages finish loading
   useEffect(() => {
     if (!isLoading && !error && messages.length > 0 && scrollContainerRef.current) {
       const el = scrollContainerRef.current;
@@ -195,8 +330,13 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
                               </div>
                               
                               {/* Usage information on the right */}
-                              {(session?.inputTokens > 0 || session?.outputTokens > 0 || session?.messageCost > 0) && (
+                              {(session?.inputTokens > 0 || session?.outputTokens > 0 || session?.cacheReadTokens > 0 || session?.cacheWriteTokens > 0 || session?.messageCost > 0) && (
                                 <div className="flex items-center gap-3 text-xs">
+                                  {isGroupedSession && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border text-amber-400/80 bg-amber-500/10 border-amber-500/20 uppercase tracking-wider">
+                                      Last run
+                                    </span>
+                                  )}
                                   {(session.inputTokens > 0 || session.outputTokens > 0) && (
                                     <div className="flex items-center gap-2">
                                       <span className="text-dark-500">In:</span>
@@ -206,9 +346,29 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
                                       <span className="text-dark-200 font-mono font-medium">{formatTokens(session.outputTokens)}</span>
                                     </div>
                                   )}
-                                  {session.messageCost > 0 && (
+                                  {(session.cacheReadTokens > 0 || session.cacheWriteTokens > 0) && (
                                     <>
                                       {(session.inputTokens > 0 || session.outputTokens > 0) && <span className="text-dark-600">•</span>}
+                                      <div className="flex items-center gap-2">
+                                        {session.cacheReadTokens > 0 && (
+                                          <>
+                                            <span className="text-dark-500">Cache Read:</span>
+                                            <span className="text-emerald-400/80 font-mono font-medium">{formatTokens(session.cacheReadTokens)}</span>
+                                          </>
+                                        )}
+                                        {session.cacheWriteTokens > 0 && (
+                                          <>
+                                            {session.cacheReadTokens > 0 && <span className="text-dark-600">•</span>}
+                                            <span className="text-dark-500">Cache Write:</span>
+                                            <span className="text-amber-400/80 font-mono font-medium">{formatTokens(session.cacheWriteTokens)}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+                                  {session.messageCost > 0 && (
+                                    <>
+                                      {(session.inputTokens > 0 || session.outputTokens > 0 || session.cacheReadTokens > 0) && <span className="text-dark-600">•</span>}
                                       <div className="flex items-center gap-1.5">
                                         <span className="text-dark-500">Cost:</span>
                                         <span className="text-dark-200 font-mono font-medium">{formatCost(session.messageCost)}</span>
@@ -278,54 +438,67 @@ export default function SessionDetailPanel({ isOpen, onClose, session }) {
                       )}
 
                       {!isLoading && !error && messages.length > 0 && (
-                        <div className="space-y-4">
-                          {messages.map((message, index) => (
-                            <div
-                              key={index}
-                              className="bg-dark-800/50 border border-dark-700/50 rounded-lg p-4"
-                            >
-                              {/* Message header */}
-                              <div className="flex items-start justify-between gap-3 mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={`px-2.5 py-1 text-xs font-medium rounded-full border ${getRoleBadgeColor(
-                                      message.role
-                                    )}`}
-                                  >
-                                    {message.role}
-                                  </span>
-                                  {message.model && (
-                                    <span className="text-xs text-dark-400">
-                                      {formatModelName(message.model)}
+                        <div className="space-y-3">
+                          {isGroupedSession && runs ? (
+                            latestRunOnly ? (
+                              // Task Manager: show only the latest run's messages, flat (no wrapper)
+                              <RunMessages
+                                messages={runs[0].messages}
+                                getRoleBadgeColor={getRoleBadgeColor}
+                                formatModelName={formatModelName}
+                              />
+                            ) : (
+                              // Scheduler: all runs as collapsible groups, latest expanded
+                              runs.map((run, i) => (
+                                <RunGroup
+                                  key={i}
+                                  run={run}
+                                  runNumber={i + 1}
+                                  totalRuns={runs.length}
+                                  getRoleBadgeColor={getRoleBadgeColor}
+                                  formatModelName={formatModelName}
+                                />
+                              ))
+                            )
+                          ) : (
+                            // All other session types: flat message list
+                            messages.map((message, index) => (
+                              <div
+                                key={index}
+                                className="bg-dark-800/50 border border-dark-700/50 rounded-lg p-4"
+                              >
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full border ${getRoleBadgeColor(message.role)}`}>
+                                      {message.role}
                                     </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3 text-xs text-dark-500">
+                                    {message.model && (
+                                      <span className="text-xs text-dark-400">{formatModelName(message.model)}</span>
+                                    )}
+                                  </div>
                                   {message.timestamp && (
-                                    <span className="text-dark-400">
+                                    <span className="text-xs text-dark-400">
                                       {new Date(message.timestamp).toLocaleString(undefined, {
                                         month: 'short',
                                         day: 'numeric',
                                         hour: 'numeric',
                                         minute: '2-digit',
                                         second: '2-digit',
-                                        hour12: true
+                                        hour12: true,
                                       })}
                                     </span>
                                   )}
                                 </div>
+                                {message.content ? (
+                                  <div className="prose prose-invert prose-sm max-w-none">
+                                    <MarkdownRenderer content={message.content} />
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-dark-500 italic">No content</p>
+                                )}
                               </div>
-
-                              {/* Message content */}
-                              {message.content ? (
-                                <div className="prose prose-invert prose-sm max-w-none">
-                                  <MarkdownRenderer content={message.content} />
-                                </div>
-                              ) : (
-                                <p className="text-sm text-dark-500 italic">No content</p>
-                              )}
-                            </div>
-                          ))}
+                            ))
+                          )}
                         </div>
                       )}
                     </div>
