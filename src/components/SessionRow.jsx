@@ -136,18 +136,23 @@ export default function SessionRow({ session, onClick, onDelete, statusDisplay }
                   {session.kind === 'main' ? 'MAIN' : session.kind === 'heartbeat' ? 'HEARTBEAT' : session.kind === 'subagent' ? 'SUBAGENT' : session.kind === 'hook' ? 'HOOK' : 'CRON'}
                 </span>
               )}
-              {(session.kind === 'main' || session.kind === 'heartbeat' || session.kind === 'cron' || session.kind === 'subagent' || session.kind === 'hook') && (
-                <span
-                  className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded border flex-shrink-0 ${
-                    session.kind === 'main' || session.kind === 'heartbeat'
-                      ? 'text-dark-400 bg-dark-700/50 border-dark-600/30'
-                      : 'text-amber-400/80 bg-amber-500/10 border-amber-500/20'
-                  }`}
-                  title={session.kind === 'main' || session.kind === 'heartbeat' ? 'Runs in the agent\'s persistent shared context' : 'Runs in a fresh isolated context'}
-                >
-                  {session.kind === 'main' || session.kind === 'heartbeat' ? 'SHARED' : 'ISOLATED'}
-                </span>
-              )}
+              {(session.kind === 'main' || session.kind === 'heartbeat' || session.kind === 'cron' || session.kind === 'subagent' || session.kind === 'hook') && (() => {
+                // Prefer explicit sessionMode from API; fall back to kind-based inference
+                const isIsolated = session.sessionMode === 'isolated'
+                  || (session.sessionMode == null && session.kind !== 'main' && session.kind !== 'heartbeat');
+                return (
+                  <span
+                    className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded border flex-shrink-0 ${
+                      isIsolated
+                        ? 'text-amber-400/80 bg-amber-500/10 border-amber-500/20'
+                        : 'text-dark-400 bg-dark-700/50 border-dark-600/30'
+                    }`}
+                    title={isIsolated ? 'Runs in a fresh isolated context' : "Runs in the agent's persistent shared context"}
+                  >
+                    {isIsolated ? 'ISOLATED' : 'SHARED'}
+                  </span>
+                );
+              })()}
             </div>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs">
               {session.agent && (

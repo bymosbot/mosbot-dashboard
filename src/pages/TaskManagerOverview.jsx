@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { 
   PlayIcon, 
   ClockIcon, 
-  ChartBarIcon, 
   CurrencyDollarIcon,
   CircleStackIcon,
+  UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
@@ -14,9 +14,10 @@ import SessionDetailPanel from '../components/SessionDetailPanel';
 import { useBotStore } from '../stores/botStore';
 import { useAgentStore } from '../stores/agentStore';
 import { useUsageStore } from '../stores/usageStore';
-import { getCronJobs, deleteCronJob, deleteSession } from '../api/client';
+import { useSchedulerStore } from '../stores/schedulerStore';
+import { getCronJobs, getSchedulerStats, deleteCronJob, deleteSession } from '../api/client';
 import logger from '../utils/logger';
-import { classNames } from '../utils/helpers';
+import { classNames, formatTokens } from '../utils/helpers';
 import { useToastStore } from '../stores/toastStore';
 
 const SESSION_TYPES = [
@@ -36,6 +37,7 @@ export default function TaskManagerOverview() {
 
   const todaySummary = useUsageStore((state) => state.todaySummary);
   const fetchTodaySummary = useUsageStore((state) => state.fetchTodaySummary);
+  const setAttention = useSchedulerStore((state) => state.setAttention);
 
   const showToast = useToastStore((state) => state.showToast);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -60,6 +62,17 @@ export default function TaskManagerOverview() {
       logger.error('Failed to load recent cron activity', err);
     }
   }, []);
+
+  const loadSchedulerStats = useCallback(async () => {
+    try {
+      const data = await getSchedulerStats();
+      if (data) {
+        setAttention({ errors: data.errors ?? 0, missed: data.missed ?? 0 });
+      }
+    } catch (err) {
+      logger.error('Failed to load scheduler stats', err);
+    }
+  }, [setAttention]);
 
   // Transform cron/heartbeat jobs into session-shaped objects so they can
   // be rendered by the same SessionRow component used for Active / Idle lists.
@@ -182,8 +195,17 @@ export default function TaskManagerOverview() {
     fetchTodaySummary();
   }, [fetchTodaySummary]);
 
+  useEffect(() => {
+    loadSchedulerStats();
+  }, [loadSchedulerStats]);
+
   const handleRefresh = async () => {
-    await Promise.all([fetchSessions(), loadRecentActivity(), fetchTodaySummary()]);
+    await Promise.all([
+      fetchSessions(),
+      loadRecentActivity(),
+      fetchTodaySummary(),
+      loadSchedulerStats(),
+    ]);
   };
 
   const handleSessionClick = useCallback((session) => {
@@ -219,9 +241,9 @@ export default function TaskManagerOverview() {
       setSelectedSession((prev) =>
         prev && (prev.jobId === session.jobId || prev.key === session.key) ? null : prev
       );
-      await Promise.all([fetchSessions(), loadRecentActivity()]);
+      await Promise.all([fetchSessions(), loadRecentActivity(), loadSchedulerStats()]);
     },
-    [fetchSessions, loadRecentActivity, showToast]
+    [fetchSessions, loadRecentActivity, loadSchedulerStats, showToast]
   );
 
   // Filter helper: session passes if (no type filter OR kind matches) AND (no agent filter OR agent matches)
@@ -311,7 +333,7 @@ export default function TaskManagerOverview() {
       <div className="flex-1 p-3 md:p-6 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             <StatCard 
               label="Running Sessions"
               value={runningCount}
@@ -328,21 +350,26 @@ export default function TaskManagerOverview() {
             <StatCard 
               label="All Sessions"
               value={allDisplayedSessionsFiltered.length}
-              icon={ChartBarIcon}
+              icon={UserGroupIcon}
               color="blue"
             />
             <StatCard 
-              label="Today's Tokens"
-              sublabel="Input + output"
-              value={todaySummary
-                ? ((todaySummary.totalTokensInput + todaySummary.totalTokensOutput) || 0).toLocaleString()
-                : '—'}
+              label="Input Tokens"
+              sublabel="Today's sessions"
+              value={formatTokens(todaySummary?.totalTokensInput)}
+              icon={CircleStackIcon}
+              color="blue"
+            />
+            <StatCard 
+              label="Output Tokens"
+              sublabel="Today's sessions"
+              value={formatTokens(todaySummary?.totalTokensOutput)}
               icon={CircleStackIcon}
               color="purple"
             />
             <StatCard 
-              label="Today's Cost"
-              sublabel="All sessions"
+              label="Total Cost"
+              sublabel="Today's sessions"
               value={todaySummary
                 ? `$${Number(todaySummary.totalCostUsd).toFixed(4)}`
                 : '—'}

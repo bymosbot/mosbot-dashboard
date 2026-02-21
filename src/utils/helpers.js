@@ -58,6 +58,14 @@ export const formatDateTimeLocal = (date) => {
   });
 };
 
+/** Format token counts as K/M (e.g. 2.17M, 22.1K) for stat cards and charts */
+export const formatTokens = (value) => {
+  if (value == null) return '—';
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(value);
+};
+
 export const truncateText = (text, maxLength = 100) => {
   if (!text || text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';

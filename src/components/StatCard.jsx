@@ -1,3 +1,13 @@
+/**
+ * StatCard — consistent KPI display across pages.
+ * Semantic icon/color mapping:
+ * - Cost: CurrencyDollarIcon, primary
+ * - Tokens: CircleStackIcon, blue (input) / purple (output or total)
+ * - Sessions: UserGroupIcon, blue
+ * - Running: PlayIcon, green
+ * - Idle: ClockIcon, yellow
+ * - Attention/Errors: ExclamationTriangleIcon, red
+ */
 export default function StatCard({ label, sublabel, value, icon: Icon, color = 'primary' }) {
   const colorClasses = {
     primary: 'bg-primary-600/10 text-primary-500',
@@ -5,6 +15,7 @@ export default function StatCard({ label, sublabel, value, icon: Icon, color = '
     blue: 'bg-blue-600/10 text-blue-500',
     yellow: 'bg-yellow-600/10 text-yellow-500',
     purple: 'bg-purple-600/10 text-purple-500',
+    red: 'bg-red-600/10 text-red-500',
   };
 
   return (

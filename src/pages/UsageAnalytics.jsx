@@ -3,8 +3,7 @@ import {
   CurrencyDollarIcon,
   ArrowPathIcon,
   ExclamationCircleIcon,
-  ChartBarIcon,
-  CpuChipIcon,
+  CircleStackIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
@@ -13,6 +12,7 @@ import CostChart from '../components/CostChart';
 import { useUsageStore, VALID_RANGES } from '../stores/usageStore';
 import { useToastStore } from '../stores/toastStore';
 import logger from '../utils/logger';
+import { formatTokens } from '../utils/helpers';
 
 const RANGE_LABELS = {
   today: 'Today',
@@ -31,13 +31,6 @@ function formatCost(value) {
   if (value < 0.0001) return `$${value.toFixed(6)}`;
   if (value < 0.01) return `$${value.toFixed(4)}`;
   return `$${value.toFixed(4)}`;
-}
-
-function formatTokens(value) {
-  if (value == null) return '—';
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return String(value);
 }
 
 function formatModelName(model) {
@@ -237,31 +230,34 @@ export default function UsageAnalytics() {
         {(data || (isLoading && data)) && (
           <>
             {/* Stat cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               <StatCard
                 label="Total Cost"
-                sublabel={`${RANGE_LABELS[range]} period`}
+                sublabel={range === 'today' ? "Today's sessions" : `${RANGE_LABELS[range]} period`}
                 value={formatCost(summary?.totalCostUsd)}
                 icon={CurrencyDollarIcon}
                 color="primary"
               />
               <StatCard
                 label="Input Tokens"
+                sublabel={range === 'today' ? "Today's sessions" : `${RANGE_LABELS[range]} period`}
                 value={formatTokens(summary?.totalTokensInput)}
-                icon={ChartBarIcon}
+                icon={CircleStackIcon}
                 color="blue"
               />
               <StatCard
                 label="Output Tokens"
+                sublabel={range === 'today' ? "Today's sessions" : `${RANGE_LABELS[range]} period`}
                 value={formatTokens(summary?.totalTokensOutput)}
-                icon={CpuChipIcon}
+                icon={CircleStackIcon}
                 color="purple"
               />
               <StatCard
                 label="Sessions"
+                sublabel={range === 'today' ? "Today's sessions" : `${RANGE_LABELS[range]} period`}
                 value={summary?.sessionCount ?? '—'}
                 icon={UserGroupIcon}
-                color="green"
+                color="blue"
               />
             </div>
 
