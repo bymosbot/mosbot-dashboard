@@ -13,6 +13,7 @@ import SessionList from '../components/SessionList';
 import SessionDetailPanel from '../components/SessionDetailPanel';
 import { useBotStore } from '../stores/botStore';
 import { useAgentStore } from '../stores/agentStore';
+import { useUsageStore } from '../stores/usageStore';
 import { getCronJobs, deleteCronJob, deleteSession } from '../api/client';
 import logger from '../utils/logger';
 import { classNames } from '../utils/helpers';
@@ -31,8 +32,10 @@ export default function TaskManagerOverview() {
   const sessionsLoaded = useBotStore((state) => state.sessionsLoaded);
   const sessionsError = useBotStore((state) => state.sessionsError);
   const fetchSessions = useBotStore((state) => state.fetchSessions);
-  const dailyCost = useBotStore((state) => state.dailyCost);
   const agents = useAgentStore((state) => state.agents).filter((a) => a.id !== 'archived');
+
+  const todaySummary = useUsageStore((state) => state.todaySummary);
+  const fetchTodaySummary = useUsageStore((state) => state.fetchTodaySummary);
 
   const showToast = useToastStore((state) => state.showToast);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -175,17 +178,12 @@ export default function TaskManagerOverview() {
     loadRecentActivity();
   }, [loadRecentActivity]);
 
-  // Calculate metrics from all displayed sessions (including recent activity)
-  const metrics = useMemo(() => {
-    const totalTokens = sessions.reduce((sum, session) => {
-      return sum + (session.inputTokens || 0) + (session.outputTokens || 0);
-    }, 0);
-
-    return { totalTokens, totalCost: dailyCost };
-  }, [sessions, dailyCost]);
+  useEffect(() => {
+    fetchTodaySummary();
+  }, [fetchTodaySummary]);
 
   const handleRefresh = async () => {
-    await Promise.all([fetchSessions(), loadRecentActivity()]);
+    await Promise.all([fetchSessions(), loadRecentActivity(), fetchTodaySummary()]);
   };
 
   const handleSessionClick = useCallback((session) => {
@@ -334,16 +332,20 @@ export default function TaskManagerOverview() {
               color="blue"
             />
             <StatCard 
-              label="Recent Tokens"
-              sublabel="Current session context"
-              value={metrics.totalTokens.toLocaleString()}
+              label="Today's Tokens"
+              sublabel="Input + output"
+              value={todaySummary
+                ? ((todaySummary.totalTokensInput + todaySummary.totalTokensOutput) || 0).toLocaleString()
+                : '—'}
               icon={CircleStackIcon}
               color="purple"
             />
             <StatCard 
               label="Today's Cost"
               sublabel="All sessions"
-              value={`$${metrics.totalCost.toFixed(4)}`}
+              value={todaySummary
+                ? `$${Number(todaySummary.totalCostUsd).toFixed(4)}`
+                : '—'}
               icon={CurrencyDollarIcon}
               color="primary"
             />

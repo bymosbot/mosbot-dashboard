@@ -10,6 +10,12 @@ export const useUsageStore = create((set, get) => ({
   error: null,
   range: 'today',
 
+  // Lightweight today-only summary used by dashboard stat cards.
+  // Fetched independently so it is always "today" regardless of the
+  // range the user has selected on the Usage & Cost page.
+  todaySummary: null,
+  todaySummaryLoading: false,
+
   fetchUsage: async (range) => {
     const activeRange = range || get().range;
     set({ isLoading: true, error: null });
@@ -23,6 +29,18 @@ export const useUsageStore = create((set, get) => ({
         error: error.response?.data?.error?.message || 'Failed to load usage data',
         isLoading: false,
       });
+    }
+  },
+
+  fetchTodaySummary: async () => {
+    if (get().todaySummaryLoading) return;
+    set({ todaySummaryLoading: true });
+    try {
+      const data = await getUsageAnalytics('today');
+      set({ todaySummary: data?.summary ?? null, todaySummaryLoading: false });
+    } catch (error) {
+      logger.error('Failed to fetch today usage summary', error);
+      set({ todaySummaryLoading: false });
     }
   },
 
