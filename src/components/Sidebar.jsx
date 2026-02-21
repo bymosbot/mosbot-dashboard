@@ -124,7 +124,7 @@ export default function Sidebar({ onCloseMobile }) {
   return (
     <div className="flex flex-col h-full bg-dark-900 border-r border-dark-800 w-64">
       {/* Bot Avatar */}
-      <Suspense fallback={<div className="h-32 bg-dark-800 animate-pulse" />}>
+      <Suspense fallback={<div className="h-24 bg-dark-800 animate-pulse" />}>
         <BotAvatar />
       </Suspense>
 

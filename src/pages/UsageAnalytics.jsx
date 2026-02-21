@@ -122,6 +122,50 @@ function ModelTable({ rows }) {
   );
 }
 
+function JobTable({ rows }) {
+  if (!rows || rows.length === 0) {
+    return (
+      <p className="text-dark-500 text-sm py-4 text-center">No cron job data for this period</p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-dark-500 text-xs uppercase tracking-wide border-b border-dark-700">
+            <th className="pb-2 pr-4 font-medium">Job</th>
+            <th className="pb-2 pr-4 font-medium text-right">Cost</th>
+            <th className="pb-2 pr-4 font-medium text-right">Runs</th>
+            <th className="pb-2 pr-4 font-medium text-right">Input</th>
+            <th className="pb-2 font-medium text-right">Output</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-dark-700/50">
+          {rows.map((row) => (
+            <tr key={row.jobId} className="hover:bg-dark-700/30 transition-colors">
+              <td className="py-2.5 pr-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-dark-200 font-medium text-xs">
+                    {row.jobLabel || 'Unknown job'}
+                  </span>
+                  <span className="font-mono text-dark-600 text-[10px]">{row.agentKey}</span>
+                </div>
+              </td>
+              <td className="py-2.5 pr-4 text-right font-semibold text-dark-100">
+                {formatCost(row.costUsd)}
+              </td>
+              <td className="py-2.5 pr-4 text-right text-dark-400">{row.runCount}</td>
+              <td className="py-2.5 pr-4 text-right text-dark-300">{formatTokens(row.tokensInput)}</td>
+              <td className="py-2.5 text-right text-dark-300">{formatTokens(row.tokensOutput)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function UsageAnalytics() {
   const { data, isLoading, error, range, fetchUsage, setRange } = useUsageStore();
   const showToast = useToastStore((state) => state.showToast);
@@ -144,6 +188,7 @@ export default function UsageAnalytics() {
   const timeSeries = data?.timeSeries || [];
   const byAgent = data?.byAgent || [];
   const byModel = data?.byModel || [];
+  const byJob = data?.byJob || [];
   const groupBy = data?.groupBy || 'hour';
 
   return (
@@ -250,6 +295,14 @@ export default function UsageAnalytics() {
                 </h2>
                 <ModelTable rows={byModel} />
               </div>
+            </div>
+
+            {/* By Cron Job */}
+            <div className="bg-dark-800 border border-dark-700 rounded-lg p-5">
+              <h2 className="text-sm font-semibold text-dark-200 uppercase tracking-wide mb-4">
+                By Cron Job
+              </h2>
+              <JobTable rows={byJob} />
             </div>
           </>
         )}

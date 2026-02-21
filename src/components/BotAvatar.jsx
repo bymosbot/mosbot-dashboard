@@ -115,7 +115,7 @@ export default function BotAvatar({ enableEyeTracking = false }) {
   };
 
   return (
-    <div className="border-b border-dark-800 px-6 py-8">
+    <div className="border-b border-dark-800 px-5 py-5">
       <style>{`
         /* Idle animations - smooth floating with breathing */
         @keyframes float-breathe-idle {
@@ -308,15 +308,15 @@ export default function BotAvatar({ enableEyeTracking = false }) {
         }
       `}</style>
       
-      {/* Large Avatar */}
-      <div className="flex flex-col items-center mb-2">
+      {/* Compact Avatar */}
+      <div className="flex flex-col items-center">
         <div 
           ref={avatarRef}
-          className="relative w-28 h-28 mb-4"
+          className="relative w-24 h-24 mb-3"
         >
           {/* Circular border with status color and heartbeat */}
           <div className={classNames(
-            "absolute inset-0 rounded-full border-4 flex items-center justify-center bg-dark-900 transition-colors duration-300",
+            "absolute inset-0 rounded-full border-2 flex items-center justify-center bg-dark-900 transition-colors duration-300",
             activityStatus === 'Offline' ? 'border-red-500 ring-heartbeat-offline' : 
             activityStatus === 'Working' ? 'border-yellow-500 ring-heartbeat-working' : 
             'border-green-500 ring-heartbeat-idle'
@@ -325,7 +325,7 @@ export default function BotAvatar({ enableEyeTracking = false }) {
             <svg 
               viewBox="0 0 100 100" 
               className={classNames(
-                "w-20 h-20",
+                "w-16 h-16",
                 activityStatus === 'Offline' ? 'avatar-sleeping' :
                 activityStatus === 'Working' ? 'avatar-working' :
                 'avatar-idle' // Active and Idle both use the idle float animation
@@ -500,25 +500,24 @@ export default function BotAvatar({ enableEyeTracking = false }) {
           </div>
         </div>
 
-        {/* Bot Name */}
-        <h2 className="text-xl font-bold text-dark-100 mb-2">MosBot</h2>
-        
-        {/* Status only - removed redundant mood */}
-        <div className={classNames(
-          'text-sm font-medium transition-colors duration-300',
-          activityStatus === 'Offline' ? 'text-red-400' :
-          activityStatus === 'Working' ? 'text-yellow-400' :
-          'text-green-400'
-        )}>
-          <span className="transition-opacity duration-300">
+        {/* Bot Name + Status */}
+        <h2 className="text-base font-bold text-dark-100 inline-flex items-center gap-2">
+          <span>MosBot</span>
+          <span className="text-dark-500 font-normal" aria-hidden="true">·</span>
+          <span className={classNames(
+            'font-medium',
+            activityStatus === 'Offline' ? 'text-red-400' :
+            activityStatus === 'Working' ? 'text-yellow-400' :
+            'text-green-400'
+          )}>
             {activityStatus === 'Offline' ? 'Offline' :
              activityStatus === 'Working'
                ? (sessionCounts.running > 0
-                 ? `${sessionCounts.running} agent${sessionCounts.running > 1 ? 's' : ''} running...`
+                 ? `${sessionCounts.running} running`
                  : 'Running')
                : 'Online'}
           </span>
-        </div>
+        </h2>
       </div>
     </div>
   );
