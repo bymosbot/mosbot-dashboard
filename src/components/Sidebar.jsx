@@ -74,6 +74,7 @@ export default function Sidebar({ onCloseMobile }) {
         { name: 'Workspaces', href: `/workspaces/${getDefaultAgent()?.id || 'coo'}`, icon: FolderIcon },
         { name: 'Projects', href: '/projects', icon: FolderOpenIcon },
         { name: 'Skills', href: '/skills', icon: SparklesIcon },
+        { name: 'Docs', href: '/docs', icon: DocumentTextIcon },
       ],
     },
     {
@@ -87,7 +88,6 @@ export default function Sidebar({ onCloseMobile }) {
     {
       label: 'System',
       items: [
-        { name: 'Docs', href: '/docs', icon: DocumentTextIcon },
         { name: 'Settings', href: '/settings', icon: Cog6ToothIcon, subpages: [
           { name: 'Users', href: '/settings/users', icon: UserIcon },
           { name: 'Model Fleet', href: '/settings/model-fleet', icon: CubeIcon },

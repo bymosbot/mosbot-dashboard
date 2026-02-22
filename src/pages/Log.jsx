@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useActivityStore } from '../stores/activityStore';
 import { parseDatabaseDate } from '../utils/helpers';
@@ -23,6 +23,8 @@ import ActivityFeedFilters from '../components/ActivityFeedFilters';
 import ResetConfirmationModal from '../components/ResetConfirmationModal';
 import { resetActivityLogs } from '../api/client';
 import logger from '../utils/logger';
+
+const REFRESH_INTERVAL_MS = 60_000; // 1 minute
 
 // ============================================================================
 // Event type metadata — icon, color, label
@@ -270,11 +272,18 @@ export default function Log() {
   const { logs, isLoading, isLoadingMore, hasMore, fetchActivity, loadMoreActivity } =
     useActivityStore();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
     fetchActivity({ limit: 50 }).catch((error) => {
       logger.error('Failed to fetch activity feed', error);
     });
+    intervalRef.current = setInterval(() => {
+      fetchActivity({ limit: 50 }).catch((error) => {
+        logger.error('Failed to refresh activity feed', error);
+      });
+    }, REFRESH_INTERVAL_MS);
+    return () => clearInterval(intervalRef.current);
   }, [fetchActivity]);
 
   const handleLoadMore = () => {

@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import {
   CurrencyDollarIcon,
   ArrowPathIcon,
@@ -16,6 +16,8 @@ import { useToastStore } from '../stores/toastStore';
 import { resetUsageData } from '../api/client';
 import logger from '../utils/logger';
 import { formatTokens } from '../utils/helpers';
+
+const REFRESH_INTERVAL_MS = 60_000; // 1 minute
 
 const RANGE_LABELS = {
   today: 'Today',
@@ -166,10 +168,15 @@ export default function UsageAnalytics() {
   const { data, isLoading, error, range, fetchUsage, setRange } = useUsageStore();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const showToast = useToastStore((state) => state.showToast);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
     fetchUsage();
-  }, [fetchUsage]);
+    intervalRef.current = setInterval(() => {
+      fetchUsage(range);
+    }, REFRESH_INTERVAL_MS);
+    return () => clearInterval(intervalRef.current);
+  }, [fetchUsage, range]);
 
   const handleRefresh = useCallback(async () => {
     try {
