@@ -1441,6 +1441,28 @@ export default function TaskModal({ isOpen, onClose, task = null }) {
                                 </p>
                               </div>
                             )}
+
+                            {internalTask?.done_at && (
+                              <div className="border-t border-dark-700 pt-4">
+                                <label className="block text-xs font-medium text-dark-500 mb-1 uppercase tracking-wider">
+                                  Completed At
+                                </label>
+                                <p className="text-dark-100">
+                                  {formatDateTimeLocal(internalTask.done_at)}
+                                </p>
+                              </div>
+                            )}
+
+                            {internalTask?.archived_at && (
+                              <div className="border-t border-dark-700 pt-4">
+                                <label className="block text-xs font-medium text-dark-500 mb-1 uppercase tracking-wider">
+                                  Archived At
+                                </label>
+                                <p className="text-dark-100">
+                                  {formatDateTimeLocal(internalTask.archived_at)}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -6,12 +6,61 @@ import { format } from 'date-fns';
 import {
   ArrowTopRightOnSquareIcon,
   ClockIcon,
+  BoltIcon,
+  HeartIcon,
+  ChatBubbleLeftRightIcon,
+  FolderIcon,
+  UserGroupIcon,
+  CpuChipIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  InformationCircleIcon,
+  XCircleIcon,
 } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
 import ActivityFeedFilters from '../components/ActivityFeedFilters';
 import logger from '../utils/logger';
 
-// Group feed entries by calendar day
+// ============================================================================
+// Event type metadata — icon, color, label
+// ============================================================================
+
+const EVENT_META = {
+  task_executed:           { icon: CheckCircleIcon,         color: 'text-green-400',  dot: 'bg-green-500',   badge: 'text-green-400 bg-green-500/10 border-green-500/20',   label: 'Task' },
+  cron_run:                { icon: ClockIcon,               color: 'text-purple-400', dot: 'bg-purple-500',  badge: 'text-purple-400 bg-purple-500/10 border-purple-500/20', label: 'Cron' },
+  heartbeat_run:           { icon: HeartIcon,               color: 'text-blue-400',   dot: 'bg-blue-500',    badge: 'text-blue-400 bg-blue-500/10 border-blue-500/20',       label: 'Heartbeat' },
+  heartbeat_attention:     { icon: ExclamationTriangleIcon, color: 'text-amber-400',  dot: 'bg-amber-500',   badge: 'text-amber-400 bg-amber-500/10 border-amber-500/20',    label: 'Attention' },
+  adhoc_request:           { icon: ChatBubbleLeftRightIcon, color: 'text-cyan-400',   dot: 'bg-cyan-500',    badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',       label: 'Adhoc' },
+  subagent_request:        { icon: CpuChipIcon,             color: 'text-indigo-400', dot: 'bg-indigo-500',  badge: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', label: 'Subagent' },
+  subagent_completed:      { icon: CpuChipIcon,             color: 'text-indigo-400', dot: 'bg-indigo-500',  badge: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', label: 'Subagent' },
+  workspace_file_created:  { icon: FolderIcon,              color: 'text-teal-400',   dot: 'bg-teal-500',    badge: 'text-teal-400 bg-teal-500/10 border-teal-500/20',       label: 'Workspace' },
+  workspace_file_updated:  { icon: FolderIcon,              color: 'text-teal-400',   dot: 'bg-teal-500',    badge: 'text-teal-400 bg-teal-500/10 border-teal-500/20',       label: 'Workspace' },
+  workspace_file_deleted:  { icon: FolderIcon,              color: 'text-red-400',    dot: 'bg-red-500',     badge: 'text-red-400 bg-red-500/10 border-red-500/20',          label: 'Workspace' },
+  org_chart_agent_created: { icon: UserGroupIcon,           color: 'text-violet-400', dot: 'bg-violet-500',  badge: 'text-violet-400 bg-violet-500/10 border-violet-500/20', label: 'Org' },
+  org_chart_agent_updated: { icon: UserGroupIcon,           color: 'text-violet-400', dot: 'bg-violet-500',  badge: 'text-violet-400 bg-violet-500/10 border-violet-500/20', label: 'Org' },
+  cron_job_created:        { icon: BoltIcon,                color: 'text-yellow-400', dot: 'bg-yellow-500',  badge: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', label: 'Scheduler' },
+  cron_job_updated:        { icon: BoltIcon,                color: 'text-yellow-400', dot: 'bg-yellow-500',  badge: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', label: 'Scheduler' },
+  cron_job_deleted:        { icon: BoltIcon,                color: 'text-red-400',    dot: 'bg-red-500',     badge: 'text-red-400 bg-red-500/10 border-red-500/20',          label: 'Scheduler' },
+  cron_job_triggered:      { icon: BoltIcon,                color: 'text-yellow-400', dot: 'bg-yellow-500',  badge: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', label: 'Triggered' },
+  legacy:                  { icon: InformationCircleIcon,   color: 'text-dark-400',   dot: 'bg-dark-500',    badge: 'text-dark-400 bg-dark-500/10 border-dark-500/20',       label: 'Legacy' },
+  system:                  { icon: InformationCircleIcon,   color: 'text-dark-400',   dot: 'bg-dark-500',    badge: 'text-dark-400 bg-dark-500/10 border-dark-500/20',       label: 'System' },
+};
+
+const SEVERITY_META = {
+  info:      { icon: InformationCircleIcon, color: 'text-dark-400' },
+  warning:   { icon: ExclamationTriangleIcon, color: 'text-amber-400' },
+  attention: { icon: ExclamationTriangleIcon, color: 'text-amber-400' },
+  error:     { icon: XCircleIcon, color: 'text-red-400' },
+};
+
+function getEventMeta(eventType) {
+  return EVENT_META[eventType] || EVENT_META.system;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
 const groupByDay = (logs) => {
   const groups = {};
 
@@ -33,23 +82,6 @@ const groupByDay = (logs) => {
   return Object.values(groups).sort((a, b) => b.date - a.date);
 };
 
-// Dot color for activity_log category
-const getCategoryColor = (category) => {
-  const colors = {
-    heartbeat:      'bg-yellow-500',
-    implementation: 'bg-blue-500',
-    improvement:    'bg-green-500',
-    bug_fix:        'bg-red-500',
-    refactor:       'bg-purple-500',
-    feature:        'bg-green-500',
-    planning:       'bg-purple-500',
-    deployment:     'bg-yellow-500',
-    testing:        'bg-blue-500',
-    maintenance:    'bg-green-500',
-  };
-  return colors[category] || 'bg-primary-500';
-};
-
 function formatCost(cost) {
   if (cost == null || cost === '') return null;
   const n = Number(cost);
@@ -58,10 +90,6 @@ function formatCost(cost) {
   return `$${n.toFixed(3)}`;
 }
 
-/**
- * Human-readable label for a model id (e.g. openrouter/moonshotai/kimi-k2.5 → Kimi K2.5).
- * Matches the format used in CronJobs.jsx and TaskManagerOverview.jsx
- */
 function formatModel(model) {
   if (!model) return null;
   const modelPart = model.includes('/') ? model.split('/').pop() : model;
@@ -78,18 +106,110 @@ function formatModel(model) {
   return modelPart;
 }
 
-function CronEntry({ log }) {
-  // Show more precise timestamp to differentiate runs that happened at the same minute
+// ============================================================================
+// Action pills — clickthrough links derived from the `links` object or raw fields
+// ============================================================================
+
+function ActionPills({ log }) {
+  const pills = [];
+
+  if (log.task_id) {
+    pills.push(
+      <Link
+        key="task"
+        to={`/task/${log.task_id}`}
+        className="flex items-center gap-1 px-2 py-0.5 bg-primary-600/20 hover:bg-primary-600/30 text-primary-400 rounded text-[11px] font-medium transition-colors border border-primary-500/20"
+        title={`View task: ${log.task_title || 'Task'}`}
+      >
+        <span>{log.task_title || 'Task'}</span>
+        <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+      </Link>
+    );
+  }
+
+  if (log.session_key) {
+    pills.push(
+      <Link
+        key="session"
+        to={`/monitor?sessionKey=${encodeURIComponent(log.session_key)}`}
+        className="flex items-center gap-1 px-2 py-0.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 rounded text-[11px] font-medium transition-colors border border-cyan-500/20"
+        title="Open in Agent Monitor"
+      >
+        <span>Monitor</span>
+        <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+      </Link>
+    );
+  }
+
+  if (log.job_id) {
+    pills.push(
+      <Link
+        key="job"
+        to={`/scheduler?jobId=${encodeURIComponent(log.job_id)}`}
+        className="flex items-center gap-1 px-2 py-0.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded text-[11px] font-medium transition-colors border border-purple-500/20"
+        title="Open in Scheduler"
+      >
+        <span>Scheduler</span>
+        <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+      </Link>
+    );
+  }
+
+  if (log.workspace_path) {
+    const isProject = log.workspace_path.startsWith('/shared/projects');
+    pills.push(
+      <Link
+        key="workspace"
+        to={isProject ? '/projects' : '/workspaces'}
+        className="flex items-center gap-1 px-2 py-0.5 bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 rounded text-[11px] font-medium transition-colors border border-teal-500/20"
+        title={log.workspace_path}
+      >
+        <span>{isProject ? 'Projects' : 'Workspace'}</span>
+        <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+      </Link>
+    );
+  }
+
+  if (pills.length === 0) return null;
+  return <div className="flex items-center gap-1.5 flex-wrap">{pills}</div>;
+}
+
+// ============================================================================
+// Severity badge
+// ============================================================================
+
+function SeverityBadge({ severity }) {
+  if (!severity || severity === 'info') return null;
+  const meta = SEVERITY_META[severity] || SEVERITY_META.info;
+  const Icon = meta.icon;
+  const label = severity.charAt(0).toUpperCase() + severity.slice(1);
+  return (
+    <span className={`flex items-center gap-1 text-[10px] font-medium ${meta.color}`}>
+      <Icon className="w-3 h-3" />
+      {label}
+    </span>
+  );
+}
+
+// ============================================================================
+// Unified entry component
+// ============================================================================
+
+function ActivityEntry({ log }) {
   const timestamp = parseDatabaseDate(log.timestamp);
   const timeLabel = format(timestamp, 'h:mm a');
   const secondsLabel = format(timestamp, ':ss');
-  const displayModel = log.model ? formatModel(log.model) : null;
+  const meta = getEventMeta(log.event_type);
+  const Icon = meta.icon;
+
+  const displayModel = log.meta?.model ? formatModel(log.meta.model) : null;
+  const displayCost = log.meta?.cost_usd ? formatCost(log.meta.cost_usd) : null;
 
   return (
     <div className="relative pl-8 pb-6 last:pb-0">
-      {/* Cron clock dot */}
-      <div className="absolute left-0 top-2 -translate-x-[9px] w-4 h-4 bg-dark-600 rounded-full border-2 border-dark-950 flex items-center justify-center">
-        <ClockIcon className="w-2.5 h-2.5 text-dark-400" />
+      {/* Event type dot */}
+      <div className={`absolute left-0 top-2 -translate-x-[9px] w-4 h-4 ${meta.dot} rounded-full border-2 border-dark-950 flex items-center justify-center`}>
+        <Icon className="w-2.5 h-2.5 text-white" />
       </div>
 
       <div className="text-xs text-dark-500 font-medium mb-2">
@@ -98,79 +218,64 @@ function CronEntry({ log }) {
       </div>
 
       <div className="card p-4 hover:bg-dark-800/50 transition-colors border-dark-700/50">
-        <div className="flex items-start justify-between gap-3 mb-1">
-          <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-            <h3 className="text-sm font-medium text-dark-300">
-              {log.job_name || log.title}
-            </h3>
-            <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded border text-purple-400 bg-purple-500/10 border-purple-500/20">
-              CRON
-            </span>
-          </div>
-        </div>
-        {/* Schedule info with agent and model inline - matches CronJobs.jsx style */}
-        <div className="flex items-center gap-2 mt-1.5 text-xs text-dark-400 flex-wrap">
-          {log.agent_name && (
-            <>
-              <span className="text-dark-500">Agent:</span>
-              <span className="text-primary-400 font-medium">{log.agent_name}</span>
-            </>
-          )}
-          {displayModel && (
-            <>
-              {log.agent_name && <span className="text-dark-600">•</span>}
-              <span className="text-dark-500">Model:</span>
-              <span className="text-dark-300 font-mono text-[11px]">{displayModel}</span>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ActivityEntry({ log }) {
-  const timeLabel = format(parseDatabaseDate(log.timestamp), 'h:mm a');
-
-  return (
-    <div className="relative pl-8 pb-6 last:pb-0">
-      {/* Category dot */}
-      <div
-        className={`absolute left-0 top-2 -translate-x-[9px] w-4 h-4 ${getCategoryColor(log.category)} rounded-full border-2 border-dark-950`}
-      />
-
-      <div className="text-xs text-blue-400 font-medium mb-2">{timeLabel}</div>
-
-      <div className="card p-4 hover:bg-dark-800/50 transition-colors">
+        {/* Header row */}
         <div className="flex items-start justify-between gap-3 mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <h3 className="text-base font-semibold text-dark-200 truncate">
+          <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+            <h3 className="text-sm font-medium text-dark-200 truncate">
               {log.title}
             </h3>
-            {log.agent_name && (
-              <span className="text-xs text-dark-500 shrink-0">{log.agent_name}</span>
-            )}
+            <span className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded border ${meta.badge}`}>
+              {meta.label}
+            </span>
+            <SeverityBadge severity={log.severity} />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {log.task_id && (
-              <Link
-                to={`/task/${log.task_id}`}
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-primary-600/20 hover:bg-primary-600/30 text-primary-400 rounded text-xs font-medium transition-colors"
-                title={`View task: ${log.task_title || 'Task'}`}
-              >
-                <span>{log.task_title || 'Task'}</span>
-                <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
-              </Link>
-            )}
-          </div>
+          <ActionPills log={log} />
         </div>
-        <p className="text-sm text-dark-400 leading-relaxed whitespace-pre-line">
-          {log.description}
-        </p>
+
+        {/* Description */}
+        {log.description && (
+          <p className="text-sm text-dark-400 leading-relaxed whitespace-pre-line mb-2">
+            {log.description}
+          </p>
+        )}
+
+        {/* Meta row */}
+        <div className="flex items-center gap-3 text-xs text-dark-500 flex-wrap">
+          {log.agent_name && (
+            <span>
+              <span className="text-dark-600">Agent:</span>{' '}
+              <span className="text-primary-400 font-medium">{log.agent_name}</span>
+            </span>
+          )}
+          {log.actor_name && (
+            <span>
+              <span className="text-dark-600">By:</span>{' '}
+              <span className="text-dark-300">{log.actor_name}</span>
+            </span>
+          )}
+          {displayModel && (
+            <span>
+              <span className="text-dark-600">Model:</span>{' '}
+              <span className="text-dark-300 font-mono text-[11px]">{displayModel}</span>
+            </span>
+          )}
+          {displayCost && (
+            <span className="text-dark-400 font-mono text-[11px]">{displayCost}</span>
+          )}
+          {log.workspace_path && (
+            <span className="font-mono text-[11px] text-dark-500 truncate max-w-xs" title={log.workspace_path}>
+              {log.workspace_path}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
+// ============================================================================
+// Page
+// ============================================================================
 
 export default function Log() {
   const { logs, isLoading, isLoadingMore, hasMore, fetchActivity, loadMoreActivity } =
@@ -226,13 +331,9 @@ export default function Log() {
 
                   {/* Timeline entries */}
                   <div className="ml-1.5 border-l-2 border-dark-800 space-y-0">
-                    {group.logs.map((log) =>
-                      log.source === 'cron' ? (
-                        <CronEntry key={log.id} log={log} />
-                      ) : (
-                        <ActivityEntry key={log.id} log={log} />
-                      )
-                    )}
+                    {group.logs.map((log) => (
+                      <ActivityEntry key={log.id} log={log} />
+                    ))}
                   </div>
                 </div>
               ))}

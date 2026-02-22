@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   PlayIcon, 
   ClockIcon, 
@@ -45,6 +46,11 @@ export default function TaskManagerOverview() {
   const [activeTab, setActiveTab] = useState('live');
   const [filterTypes, setFilterTypes] = useState([]);
   const [filterAgents, setFilterAgents] = useState([]);
+
+  // Deep-link support: ?sessionKey=<key> auto-selects and opens the session detail panel
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkSessionKey = searchParams.get('sessionKey');
+  const deepLinkApplied = useRef(false);
 
   // Recent cron/heartbeat activity
   const [recentJobs, setRecentJobs] = useState([]);
@@ -211,6 +217,22 @@ export default function TaskManagerOverview() {
   useEffect(() => {
     loadSchedulerStats();
   }, [loadSchedulerStats]);
+
+  // Auto-select session from ?sessionKey= deep link once sessions are loaded
+  useEffect(() => {
+    if (!deepLinkSessionKey || deepLinkApplied.current || !sessionsLoaded) return;
+    const match = sessions.find((s) => s.key === deepLinkSessionKey);
+    if (match) {
+      deepLinkApplied.current = true;
+      setSelectedSession(match);
+      // Clear the query param so back-navigation works cleanly
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('sessionKey');
+        return next;
+      }, { replace: true });
+    }
+  }, [deepLinkSessionKey, sessions, sessionsLoaded, setSearchParams]);
 
   const handleRefresh = async () => {
     await Promise.all([

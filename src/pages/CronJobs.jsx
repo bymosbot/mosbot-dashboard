@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Dialog, Transition } from '@headlessui/react';
 import {
   PlusIcon,
@@ -1140,6 +1141,11 @@ export default function CronJobs() {
   const showToast = useToastStore((state) => state.showToast);
   const setAttention = useSchedulerStore((state) => state.setAttention);
 
+  // Deep-link support: ?jobId=<id> highlights/opens the matching job
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkJobId = searchParams.get('jobId');
+  const deepLinkApplied = useRef(false);
+
   const loadJobs = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -1161,6 +1167,21 @@ export default function CronJobs() {
       })
       .catch(() => { /* keep default UTC */ });
   }, [loadJobs]);
+
+  // Auto-highlight job from ?jobId= deep link once jobs are loaded
+  useEffect(() => {
+    if (!deepLinkJobId || deepLinkApplied.current || isLoading || jobs.length === 0) return;
+    const match = jobs.find((j) => (j.jobId || j.id) === deepLinkJobId);
+    if (match) {
+      deepLinkApplied.current = true;
+      setSelectedJob(match);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('jobId');
+        return next;
+      }, { replace: true });
+    }
+  }, [deepLinkJobId, jobs, isLoading, setSearchParams]);
 
   const handleCreate = async (payload) => {
     await createCronJob(payload);

@@ -181,12 +181,18 @@ export default function TaskCard({ task, onClick }) {
       {/* Footer with metadata */}
       <div className="flex items-center justify-between text-xs text-dark-500">
         <div className="flex items-center gap-3">
-          {(task.due_date || task.dueDate) && (
+          {/* Show done_at for completed tasks, otherwise show due_date */}
+          {task.done_at ? (
+            <div className="flex items-center gap-1 text-green-400">
+              <CheckCircleIcon className="w-4 h-4" />
+              <span>Completed {formatRelativeTime(task.done_at)}</span>
+            </div>
+          ) : (task.due_date || task.dueDate) ? (
             <div className="flex items-center gap-1">
               <ClockIcon className="w-4 h-4" />
               <span>{formatRelativeTime(task.due_date || task.dueDate)}</span>
             </div>
-          )}
+          ) : null}
           {task.comments && task.comments > 0 && (
             <div className="flex items-center gap-1">
               <ChatBubbleLeftIcon className="w-4 h-4" />

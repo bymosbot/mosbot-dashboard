@@ -7,7 +7,11 @@ const DEFAULT_FILTERS = {
   endDate: null,
   category: null,
   agentId: null,
-  source: 'all',
+  source: null,
+  event_type: null,
+  severity: null,
+  job_id: null,
+  session_key: null,
 };
 
 export const useActivityStore = create((set, get) => ({
@@ -36,22 +40,27 @@ export const useActivityStore = create((set, get) => ({
     get().fetchActivity({ limit: get().pageSize, offset: 0 });
   },
 
+  // Build query params from a filters object
+  _buildParams: (filters, extra = {}) => {
+    const params = { ...extra };
+    if (filters.category) params.category = filters.category;
+    if (filters.agentId) params.agent_id = filters.agentId;
+    if (filters.source) params.source = filters.source;
+    if (filters.event_type) params.event_type = filters.event_type;
+    if (filters.severity) params.severity = filters.severity;
+    if (filters.job_id) params.job_id = filters.job_id;
+    if (filters.session_key) params.session_key = filters.session_key;
+    if (filters.startDate) params.start_date = filters.startDate;
+    if (filters.endDate) params.end_date = filters.endDate;
+    return params;
+  },
+
   // Fetch the unified feed (replaces existing logs)
-  fetchActivity: async ({ limit = 50, offset = 0, category, agentId, source, startDate, endDate } = {}) => {
+  fetchActivity: async ({ limit = 50, offset = 0, ...overrides } = {}) => {
     set({ isLoading: true, error: null });
     try {
-      const params = { limit, offset };
-      const activeFilters = { category, agentId, source, startDate, endDate };
-
-      // Fall back to store filters for any undefined param
-      const storeFilters = get().filters;
-      if (activeFilters.category ?? storeFilters.category) params.category = activeFilters.category ?? storeFilters.category;
-      if (activeFilters.agentId ?? storeFilters.agentId) params.agent_id = activeFilters.agentId ?? storeFilters.agentId;
-      if ((activeFilters.source ?? storeFilters.source) && (activeFilters.source ?? storeFilters.source) !== 'all') {
-        params.source = activeFilters.source ?? storeFilters.source;
-      }
-      if (activeFilters.startDate ?? storeFilters.startDate) params.start_date = activeFilters.startDate ?? storeFilters.startDate;
-      if (activeFilters.endDate ?? storeFilters.endDate) params.end_date = activeFilters.endDate ?? storeFilters.endDate;
+      const storeFilters = { ...get().filters, ...overrides };
+      const params = get()._buildParams(storeFilters, { limit, offset });
 
       const response = await api.get('/activity/feed', { params });
       const logs = response.data.data || [];
@@ -80,12 +89,7 @@ export const useActivityStore = create((set, get) => ({
     try {
       const newOffset = state.currentOffset + state.pageSize;
       const f = state.filters;
-      const params = { limit: state.pageSize, offset: newOffset };
-      if (f.category) params.category = f.category;
-      if (f.agentId) params.agent_id = f.agentId;
-      if (f.source && f.source !== 'all') params.source = f.source;
-      if (f.startDate) params.start_date = f.startDate;
-      if (f.endDate) params.end_date = f.endDate;
+      const params = get()._buildParams(f, { limit: state.pageSize, offset: newOffset });
 
       const response = await api.get('/activity/feed', { params });
       const newLogs = response.data.data || [];

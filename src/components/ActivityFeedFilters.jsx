@@ -4,17 +4,31 @@ import { useActivityStore } from '../stores/activityStore';
 import { api } from '../api/client';
 import logger from '../utils/logger';
 
-const CATEGORIES = [
-  { value: 'heartbeat',      label: 'Heartbeat' },
-  { value: 'implementation', label: 'Implementation' },
-  { value: 'improvement',    label: 'Improvement' },
-  { value: 'bug_fix',        label: 'Bug Fix' },
-  { value: 'refactor',       label: 'Refactor' },
-  { value: 'feature',        label: 'Feature' },
-  { value: 'planning',       label: 'Planning' },
-  { value: 'deployment',     label: 'Deployment' },
-  { value: 'testing',        label: 'Testing' },
-  { value: 'maintenance',    label: 'Maintenance' },
+const EVENT_TYPES = [
+  { value: 'task_executed',           label: 'Task Executed' },
+  { value: 'cron_run',                label: 'Cron Run' },
+  { value: 'heartbeat_run',           label: 'Heartbeat' },
+  { value: 'heartbeat_attention',     label: 'Heartbeat Attention' },
+  { value: 'adhoc_request',           label: 'Adhoc Request' },
+  { value: 'subagent_request',        label: 'Subagent Request' },
+  { value: 'subagent_completed',      label: 'Subagent Completed' },
+  { value: 'workspace_file_created',  label: 'File Created' },
+  { value: 'workspace_file_updated',  label: 'File Updated' },
+  { value: 'workspace_file_deleted',  label: 'File Deleted' },
+  { value: 'org_chart_agent_created', label: 'Agent Created' },
+  { value: 'org_chart_agent_updated', label: 'Agent Updated' },
+  { value: 'cron_job_created',        label: 'Cron Job Created' },
+  { value: 'cron_job_updated',        label: 'Cron Job Updated' },
+  { value: 'cron_job_deleted',        label: 'Cron Job Deleted' },
+  { value: 'cron_job_triggered',      label: 'Cron Job Triggered' },
+  { value: 'legacy',                  label: 'Legacy' },
+];
+
+const SEVERITIES = [
+  { value: 'info',      label: 'Info' },
+  { value: 'warning',   label: 'Warning' },
+  { value: 'attention', label: 'Attention' },
+  { value: 'error',     label: 'Error' },
 ];
 
 const DATE_PRESETS = [
@@ -53,11 +67,12 @@ export default function ActivityFeedFilters() {
   }, []);
 
   const hasActiveFilters =
-    filters.category ||
+    filters.event_type ||
+    filters.severity ||
     filters.agentId ||
     filters.startDate ||
     filters.endDate ||
-    (filters.source && filters.source !== 'all');
+    filters.source;
 
   const handlePreset = (preset) => {
     if (activePreset === preset.label) {
@@ -91,23 +106,6 @@ export default function ActivityFeedFilters() {
     <div className="px-3 md:px-6 py-3 bg-dark-900 border-b border-dark-800">
       <div className="max-w-5xl mx-auto flex flex-wrap items-center gap-3">
 
-        {/* Source toggle */}
-        <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-1 border border-dark-700">
-          {['all', 'activity', 'cron'].map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilters({ source: s })}
-              className={`px-3 py-1 rounded text-xs font-medium transition-colors capitalize ${
-                filters.source === s
-                  ? 'bg-primary-600 text-white'
-                  : 'text-dark-400 hover:text-dark-200'
-              }`}
-            >
-              {s === 'all' ? 'All' : s === 'activity' ? 'Activity' : 'Cron'}
-            </button>
-          ))}
-        </div>
-
         {/* Date presets */}
         <div className="flex items-center gap-1">
           {DATE_PRESETS.map((preset) => (
@@ -135,15 +133,27 @@ export default function ActivityFeedFilters() {
           </button>
         </div>
 
-        {/* Category dropdown */}
+        {/* Event type dropdown */}
         <select
-          value={filters.category || ''}
-          onChange={(e) => setFilters({ category: e.target.value || null })}
+          value={filters.event_type || ''}
+          onChange={(e) => setFilters({ event_type: e.target.value || null })}
           className="bg-dark-800 border border-dark-700 rounded-lg px-3 py-1.5 text-xs text-dark-300 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
         >
-          <option value="">All categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
+          <option value="">All event types</option>
+          {EVENT_TYPES.map((et) => (
+            <option key={et.value} value={et.value}>{et.label}</option>
+          ))}
+        </select>
+
+        {/* Severity dropdown */}
+        <select
+          value={filters.severity || ''}
+          onChange={(e) => setFilters({ severity: e.target.value || null })}
+          className="bg-dark-800 border border-dark-700 rounded-lg px-3 py-1.5 text-xs text-dark-300 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+        >
+          <option value="">All severities</option>
+          {SEVERITIES.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select>
 

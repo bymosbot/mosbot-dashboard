@@ -13,7 +13,7 @@ vi.mock('../api/client', () => ({
 describe('activityStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset store state
+    // Reset store state (including filters so tests don't bleed into each other)
     useActivityStore.setState({
       logs: [],
       isLoading: false,
@@ -22,6 +22,17 @@ describe('activityStore', () => {
       hasMore: true,
       currentOffset: 0,
       pageSize: 50,
+      filters: {
+        startDate: null,
+        endDate: null,
+        category: null,
+        agentId: null,
+        source: null,
+        event_type: null,
+        severity: null,
+        job_id: null,
+        session_key: null,
+      },
     });
   });
 
@@ -56,26 +67,81 @@ describe('activityStore', () => {
         },
       });
 
-      const params = {
-        limit: 50,
-        offset: 10,
-        category: 'task',
-        startDate: '2024-01-01',
-        endDate: '2024-01-31',
-      };
+      // Set store filters before fetching
+      useActivityStore.setState({
+        filters: {
+          startDate: '2024-01-01',
+          endDate: '2024-01-31',
+          event_type: 'task_executed',
+          severity: null,
+          agentId: null,
+          source: null,
+          job_id: null,
+          session_key: null,
+          category: null,
+        },
+      });
 
-      await useActivityStore.getState().fetchActivity(params);
+      await useActivityStore.getState().fetchActivity({ limit: 50, offset: 10 });
 
       expect(api.get).toHaveBeenCalledWith('/activity/feed', {
         params: {
           limit: 50,
           offset: 10,
-          category: 'task',
+          event_type: 'task_executed',
           start_date: '2024-01-01',
           end_date: '2024-01-31',
         },
       });
       expect(useActivityStore.getState().logs).toEqual(mockLogs);
+    });
+
+    it('passes event_type filter to API', async () => {
+      api.get.mockResolvedValue({ data: { data: [], pagination: { total: 0 } } });
+
+      useActivityStore.setState({
+        filters: {
+          event_type: 'cron_run',
+          severity: null,
+          agentId: null,
+          source: null,
+          job_id: null,
+          session_key: null,
+          startDate: null,
+          endDate: null,
+          category: null,
+        },
+      });
+
+      await useActivityStore.getState().fetchActivity();
+
+      expect(api.get).toHaveBeenCalledWith('/activity/feed', {
+        params: { limit: 50, offset: 0, event_type: 'cron_run' },
+      });
+    });
+
+    it('passes severity filter to API', async () => {
+      api.get.mockResolvedValue({ data: { data: [], pagination: { total: 0 } } });
+
+      useActivityStore.setState({
+        filters: {
+          event_type: null,
+          severity: 'attention',
+          agentId: null,
+          source: null,
+          job_id: null,
+          session_key: null,
+          startDate: null,
+          endDate: null,
+          category: null,
+        },
+      });
+
+      await useActivityStore.getState().fetchActivity();
+
+      expect(api.get).toHaveBeenCalledWith('/activity/feed', {
+        params: { limit: 50, offset: 0, severity: 'attention' },
+      });
     });
 
     it('sets loading state during fetch', async () => {
