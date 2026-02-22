@@ -87,14 +87,15 @@ function formatRelativeTime(timestamp) {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
+  if (minutes < 1) return isFuture ? 'now' : 'just now';
+
   let label;
-  if (minutes < 1) label = 'just now';
-  else if (minutes < 60) label = `${minutes}m`;
-  else if (hours < 24) label = `${hours}h ${minutes % 60}m`;
+  if (minutes < 60) label = `${minutes}m`;
+  else if (hours < 2) label = `${hours}h ${minutes % 60}m`;
+  else if (hours < 24) label = `${hours}h`;
   else label = `${days}d ${hours % 24}h`;
 
-  if (isFuture) return `${label} from now`;
-  return `${label} ago`;
+  return isFuture ? `${label} from now` : `${label} ago`;
 }
 
 /**
