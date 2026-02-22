@@ -33,6 +33,8 @@ const SEVERITIES = [
 
 const DATE_PRESETS = [
   { label: 'Today',    days: 0 },
+  { label: 'Last 24h', days: 1 },
+  { label: 'Last 3d',  days: 3 },
   { label: 'Last 7d',  days: 7 },
   { label: 'Last 30d', days: 30 },
 ];
