@@ -364,12 +364,12 @@ export default function WorkspaceExplorer({
   const handleFileSelect = (file) => {
     setSelectedFile(file);
     if (file.type === 'directory') {
-      // Expand the clicked folder and ensure its ancestors are also expanded
-      expandAncestors(file.path + '/__placeholder__');
-      handleToggleExpand(file.path, true);
+      // In flat view, navigate into the folder
       if (viewMode === 'flat') {
         setCurrentPath(file.path);
       }
+      // In tree view, folder expansion/collapse is handled by TreeNode.handleClick
+      // so we don't interfere with the toggle behavior here
     } else {
       // Expand all ancestor folders so the selected file is visible in context
       expandAncestors(file.path);

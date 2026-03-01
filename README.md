@@ -10,6 +10,20 @@ MosBot Dashboard is a React 18 + Vite SPA that provides task management, org cha
 
 > **Disclaimer:** MosBot OS is vibe-coded with minimal actual code reviews. It is currently used for personal usage only.
 
+## Screenshots
+
+| Feature | Preview |
+|--------|---------|
+| **Task Board** | ![Task Board](https://bymosbot.github.io/mosbot-docs/img/screenshots/mosbot-task-board.png) |
+| **Agent Monitor** | ![Agent Monitor](https://bymosbot.github.io/mosbot-docs/img/screenshots/mosbot-agent-monitor.png) |
+| **Org Chart** | ![Org Chart](https://bymosbot.github.io/mosbot-docs/img/screenshots/mosbot-org-chart.png) |
+| **Workspaces** | ![Workspaces](https://bymosbot.github.io/mosbot-docs/img/screenshots/mosbot-workspaces.png) |
+| **Standups** | ![Standups](https://bymosbot.github.io/mosbot-docs/img/screenshots/mosbot-standup.png) |
+| **Scheduler** | ![Scheduler](https://bymosbot.github.io/mosbot-docs/img/screenshots/mosbot-ascheduler.png) |
+| **Usage & Cost** | ![Usage](https://bymosbot.github.io/mosbot-docs/img/screenshots/mosbot-usage-and-cost.png) |
+
+See the [full documentation site](https://bymosbot.github.io/mosbot-docs/) for more screenshots.
+
 ## Features
 
 - **Agent Monitor** — view active sessions, costs, and usage analytics
