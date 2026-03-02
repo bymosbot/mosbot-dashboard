@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Tool call display support in SessionDetailPanel with expandable argument details
+- ToolCallChip component for displaying tool calls with preview and expandable JSON arguments
+
+### Changed
+
+- Message rendering now handles both string and array content formats (blocks-based messages)
+- Tool calls are now displayed alongside message content in session detail view
+- Improved handling of assistant messages with no content or tool calls (skips empty messages)
+
 ## [0.1.4] - 2026-03-02
 
 ### Added

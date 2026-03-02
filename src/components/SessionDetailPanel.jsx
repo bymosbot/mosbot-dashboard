@@ -81,12 +81,70 @@ function groupMessagesIntoRuns(messages) {
   return runs;
 }
 
+/** Helper to format tool call summary for display. */
+function toolCallSummary(tc) {
+  const args = tc.arguments || {};
+  const firstVal = Object.values(args)[0];
+  const preview = typeof firstVal === 'string' ? firstVal : JSON.stringify(firstVal ?? '');
+  const short = preview.length > 48 ? `${preview.slice(0, 48)}…` : preview;
+  return short ? `${tc.name}(${short})` : tc.name;
+}
+
+/** Tool call chip component with expandable arguments. */
+function ToolCallChip({ tc }) {
+  const [open, setOpen] = useState(false);
+  const hasArgs = tc.arguments && Object.keys(tc.arguments).length > 0;
+  return (
+    <span className="inline-flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => hasArgs && setOpen((o) => !o)}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-dark-700/60 border border-dark-600/50 text-dark-400 ${hasArgs ? 'hover:bg-dark-700 hover:text-dark-300 cursor-pointer' : 'cursor-default'} transition-colors`}
+      >
+        <span className="text-dark-500">→</span>
+        {toolCallSummary(tc)}
+        {hasArgs &&
+          (open ? (
+            <ChevronDownIcon className="w-2.5 h-2.5 ml-0.5 flex-shrink-0" />
+          ) : (
+            <ChevronRightIcon className="w-2.5 h-2.5 ml-0.5 flex-shrink-0" />
+          ))}
+      </button>
+      {open && (
+        <pre className="text-[11px] font-mono text-dark-300 bg-dark-900/60 border border-dark-700/50 rounded px-3 py-2 whitespace-pre-wrap break-all leading-relaxed">
+          {JSON.stringify(tc.arguments, null, 2)}
+        </pre>
+      )}
+    </span>
+  );
+}
+
 /** Renders the messages inside a run group. */
 function RunMessages({ messages, getRoleBadgeColor, formatModelName, getDisplayRole }) {
   return (
     <div className="space-y-3">
       {messages.map((message, idx) => {
         const displayRole = getDisplayRole(message);
+
+        // Extract blocks and content, handling both string and array formats
+        const blocks = Array.isArray(message.blocks)
+          ? message.blocks
+          : Array.isArray(message.content)
+            ? message.content
+            : [];
+        const content =
+          message.content && typeof message.content === 'string'
+            ? message.content.trim()
+            : blocks
+                .filter((b) => b.type === 'text')
+                .map((b) => b.text)
+                .join('')
+                .trim();
+        const toolCalls = blocks.filter((b) => b.type === 'toolCall');
+
+        // Skip assistant messages with truly nothing to show
+        if (!content && !toolCalls.length && message.role === 'assistant') return null;
+
         return (
           <div key={idx} className="bg-dark-800/50 border border-dark-700/50 rounded-lg p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
@@ -113,11 +171,19 @@ function RunMessages({ messages, getRoleBadgeColor, formatModelName, getDisplayR
                 </span>
               )}
             </div>
-            {message.content ? (
+            {content && (
               <div className="prose prose-invert prose-sm max-w-none">
-                <MarkdownRenderer content={message.content} />
+                <MarkdownRenderer content={content} />
               </div>
-            ) : (
+            )}
+            {toolCalls.length > 0 && (
+              <div className={`flex flex-wrap gap-1.5 ${content ? 'mt-3' : ''}`}>
+                {toolCalls.map((tc, i) => (
+                  <ToolCallChip key={i} tc={tc} />
+                ))}
+              </div>
+            )}
+            {!content && !toolCalls.length && (
               <p className="text-sm text-dark-500 italic">No content</p>
             )}
           </div>
@@ -776,6 +842,31 @@ export default function SessionDetailPanel({ isOpen, onClose, session, latestRun
                                   // All other session types: flat message list
                                   messages.map((message, index) => {
                                     const displayRole = getDisplayRole(message);
+
+                                    // Extract blocks and content, handling both string and array formats
+                                    const blocks = Array.isArray(message.blocks)
+                                      ? message.blocks
+                                      : Array.isArray(message.content)
+                                        ? message.content
+                                        : [];
+                                    const content =
+                                      message.content && typeof message.content === 'string'
+                                        ? message.content.trim()
+                                        : blocks
+                                            .filter((b) => b.type === 'text')
+                                            .map((b) => b.text)
+                                            .join('')
+                                            .trim();
+                                    const toolCalls = blocks.filter((b) => b.type === 'toolCall');
+
+                                    // Skip assistant messages with truly nothing to show
+                                    if (
+                                      !content &&
+                                      !toolCalls.length &&
+                                      message.role === 'assistant'
+                                    )
+                                      return null;
+
                                     return (
                                       <div
                                         key={index}
@@ -810,11 +901,21 @@ export default function SessionDetailPanel({ isOpen, onClose, session, latestRun
                                             </span>
                                           )}
                                         </div>
-                                        {message.content ? (
+                                        {content && (
                                           <div className="prose prose-invert prose-sm max-w-none">
-                                            <MarkdownRenderer content={message.content} />
+                                            <MarkdownRenderer content={content} />
                                           </div>
-                                        ) : (
+                                        )}
+                                        {toolCalls.length > 0 && (
+                                          <div
+                                            className={`flex flex-wrap gap-1.5 ${content ? 'mt-3' : ''}`}
+                                          >
+                                            {toolCalls.map((tc, i) => (
+                                              <ToolCallChip key={i} tc={tc} />
+                                            ))}
+                                          </div>
+                                        )}
+                                        {!content && !toolCalls.length && (
                                           <p className="text-sm text-dark-500 italic">No content</p>
                                         )}
                                       </div>
