@@ -79,7 +79,7 @@ docs/                   — canonical documentation
 
 - The **MosBot OS documentation home** is `docs/README.md` in the [mosbot-api repository](https://github.com/bymosbot/mosbot-api). Dashboard-specific docs live here; system-wide docs live there.
 - Prefer updating canonical docs in `docs/` rather than adding new root-level markdown files.
-- If replacing an older doc, keep it as a short pointer page and preserve original content under `docs/archive/` when useful.
+- If replacing an older doc, keep it as a short pointer page and preserve original content under `docs/archive/` when useful (create the folder if it doesn't exist yet).
 - Engineering patterns and code conventions live in `.cursor/rules/`, not in `docs/`.
 
 ## Contributing
