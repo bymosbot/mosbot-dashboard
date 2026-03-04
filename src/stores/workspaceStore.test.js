@@ -312,18 +312,42 @@ describe('workspaceStore', () => {
     });
 
     it('createDirectory returns exists=true when directory already exists', async () => {
-      api.post.mockRejectedValue({
-        response: {
-          status: 409,
-          data: { error: { code: 'FILE_EXISTS', message: 'already exists' } },
-        },
-      });
+      api.get.mockResolvedValue({ data: { data: { files: [] } } });
 
       const result = await useWorkspaceStore.getState().createDirectory({ path: '/docs' });
       expect(result).toEqual({ path: '/docs/.gitkeep', exists: true });
+      expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('createDirectory normalizes duplicate slashes before creating .gitkeep', async () => {
+      api.get.mockRejectedValue({
+        response: { status: 404, data: { error: { message: 'not found' } } },
+      });
+      api.post.mockResolvedValue({ data: { data: { path: '/docs/.gitkeep' } } });
+
+      await useWorkspaceStore.getState().createDirectory({ path: '/docs/' });
+
+      expect(api.get).toHaveBeenCalledWith('/openclaw/workspace/files', {
+        params: { path: '/docs', recursive: 'false' },
+        __suppressErrorStatuses: [404],
+      });
+      expect(api.post).toHaveBeenCalledWith(
+        '/openclaw/workspace/files',
+        {
+          path: '/docs/.gitkeep',
+          content: '',
+          encoding: 'utf8',
+        },
+        {
+          __suppressErrorStatuses: [409],
+        },
+      );
     });
 
     it('createDirectory throws formatted error for non-exists failures', async () => {
+      api.get.mockRejectedValue({
+        response: { status: 404, data: { error: { message: 'not found' } } },
+      });
       api.post.mockRejectedValue(new Error('mkdir failed'));
 
       await expect(useWorkspaceStore.getState().createDirectory({ path: '/docs' })).rejects.toThrow(

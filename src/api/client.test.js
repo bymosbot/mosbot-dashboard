@@ -365,6 +365,21 @@ describe('api client', () => {
         }),
       );
     });
+
+    it('does not log errors for explicitly suppressed statuses', async () => {
+      const error = {
+        response: { status: 409 },
+        config: {
+          url: '/openclaw/workspace/files',
+          method: 'post',
+          __retryCount: 0,
+          __suppressErrorStatuses: [409],
+        },
+      };
+
+      await expect(responseErrorHandler(error)).rejects.toBe(error);
+      expect(logger.error).not.toHaveBeenCalled();
+    });
   });
 
   describe('base configuration', () => {

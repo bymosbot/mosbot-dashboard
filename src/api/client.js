@@ -39,6 +39,21 @@ const shouldRetry = (error, retryCount) => {
   return RETRYABLE_STATUS_CODES.includes(status);
 };
 
+const shouldSuppressErrorLogging = (error) => {
+  const config = error.config || {};
+  if (config.__suppressErrorLogging === true) {
+    return true;
+  }
+
+  const status = error.response?.status;
+  const suppressedStatuses = config.__suppressErrorStatuses;
+  return (
+    Number.isInteger(status) &&
+    Array.isArray(suppressedStatuses) &&
+    suppressedStatuses.includes(status)
+  );
+};
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -87,6 +102,10 @@ api.interceptors.response.use(
 
       // Retry the request
       return api(config);
+    }
+
+    if (shouldSuppressErrorLogging(error)) {
+      return Promise.reject(error);
     }
 
     // Use structured logging
