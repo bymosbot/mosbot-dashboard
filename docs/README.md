@@ -29,7 +29,7 @@ These docs describe the **MosBot Dashboard** (the UI/control plane) and how it f
 - `features/kanban.md`
 - `features/task-modal.md`
 - `features/task-manager.md`
-- `features/org-chart.md`
+- `features/agent-chart.md` (Agents dashboard)
 - `features/workspaces.md`
 - `features/docs.md`
 - `features/activity-log.md`

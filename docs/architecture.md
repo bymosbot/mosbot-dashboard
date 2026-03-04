@@ -12,7 +12,7 @@ src/
 ├── stores/        # Zustand state stores
 ├── utils/         # Utility functions
 ├── constants/     # Static constants (model lists, etc.)
-├── config/        # Static config (org chart fallbacks)
+├── config/        # Static config (agent visualization fallbacks)
 ├── App.jsx        # Router and layout
 └── main.jsx       # Entry point
 ```
@@ -21,17 +21,17 @@ src/
 
 Each domain has its own Zustand store in `src/stores/`:
 
-| Store | Responsibility |
-| ----- | -------------- |
-| `authStore` | JWT token, current user, login/logout |
-| `taskStore` | Tasks, kanban columns, filters |
-| `agentStore` | OpenClaw agents and org chart |
-| `workspaceStore` | Workspace file tree |
-| `activityStore` | Activity log feed |
-| `schedulerStore` | Cron jobs |
-| `usageStore` | Session usage analytics |
-| `uiStore` | UI state (sidebar, modals) |
-| `toastStore` | Toast notifications |
+| Store            | Responsibility                            |
+| ---------------- | ----------------------------------------- |
+| `authStore`      | JWT token, current user, login/logout     |
+| `taskStore`      | Tasks, kanban columns, filters            |
+| `agentStore`     | OpenClaw agents and agents-page hierarchy |
+| `workspaceStore` | Workspace file tree                       |
+| `activityStore`  | Activity log feed                         |
+| `schedulerStore` | Cron jobs                                 |
+| `usageStore`     | Session usage analytics                   |
+| `uiStore`        | UI state (sidebar, modals)                |
+| `toastStore`     | Toast notifications                       |
 
 ## API client
 

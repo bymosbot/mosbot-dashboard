@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard no longer performs workspace symlink/link write operations on page load;
   docs-link reconciliation is system-managed by mosbot-api + workspace-service lifecycle hooks
 - Dashboard docs updated to reflect `/docs` as the shared docs workspace root
+- Dashboard docs now consistently refer to the Agents page (replacing legacy Org Chart wording)
 - CI workflow updated to include test execution step
 - Vite config updated to support test environment
 - `.gitignore` updated to exclude additional generated files
