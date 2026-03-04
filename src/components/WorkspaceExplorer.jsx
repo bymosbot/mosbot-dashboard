@@ -12,10 +12,13 @@ import {
   ArrowUpIcon,
   FolderIcon,
   ChevronUpDownIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
+import { useUIStore } from '../stores/uiStore';
 import WorkspaceTree from './WorkspaceTree';
 import FilePreview from './FilePreview';
 import ContextMenu from './ContextMenu';
@@ -74,6 +77,7 @@ export default function WorkspaceExplorer({
 
   const { isAdmin } = useAuthStore();
   const { showToast } = useToastStore();
+  const { showHiddenFiles, toggleShowHiddenFiles } = useUIStore();
 
   const [viewMode, setViewMode] = useState('tree'); // 'tree' or 'flat'
   const [searchQuery, setSearchQuery] = useState('');
@@ -457,9 +461,10 @@ export default function WorkspaceExplorer({
     return crumbs;
   }, [rootSegments, currentPath]);
 
-  // Filter files by search query (used for flat view and custom renderers)
+  // Filter files by search query and hidden files preference (used for flat view and custom renderers)
   const filteredFiles =
     currentListing?.files?.filter((file) => {
+      if (!showHiddenFiles && file.name.startsWith('.')) return false;
       if (!searchQuery.trim()) return true;
       return file.name.toLowerCase().includes(searchQuery.toLowerCase());
     }) || [];
@@ -472,6 +477,7 @@ export default function WorkspaceExplorer({
   const rootListing = listings[`${agentId}:/:false`];
   const rootFiles =
     rootListing?.files?.filter((file) => {
+      if (!showHiddenFiles && file.name.startsWith('.')) return false;
       if (!searchQuery.trim()) return true;
       return file.name.toLowerCase().includes(searchQuery.toLowerCase());
     }) || [];
@@ -820,6 +826,24 @@ export default function WorkspaceExplorer({
                 className="pl-8 pr-3 py-1.5 w-40 bg-dark-800 border border-dark-700 rounded text-sm text-dark-100 placeholder-dark-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
+
+            {/* Hidden files toggle */}
+            <button
+              onClick={toggleShowHiddenFiles}
+              className={classNames(
+                'p-1.5 rounded transition-colors',
+                showHiddenFiles
+                  ? 'text-dark-200 hover:text-white'
+                  : 'text-dark-500 hover:text-dark-300',
+              )}
+              title={showHiddenFiles ? 'Hide dotfiles' : 'Show dotfiles'}
+            >
+              {showHiddenFiles ? (
+                <EyeIcon className="w-4 h-4" />
+              ) : (
+                <EyeSlashIcon className="w-4 h-4" />
+              )}
+            </button>
 
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-dark-800 rounded p-1">

@@ -13,6 +13,9 @@ export const useUIStore = create(
       // Sidebar state
       sidebarCollapsed: false,
 
+      // File browser state - hide dotfiles (.gitkeep, .gitignore, etc.) by default
+      showHiddenFiles: false,
+
       // Actions
       toggleSidebar: () => {
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
@@ -21,10 +24,17 @@ export const useUIStore = create(
       setSidebarCollapsed: (collapsed) => {
         set({ sidebarCollapsed: collapsed });
       },
+
+      toggleShowHiddenFiles: () => {
+        set((state) => ({ showHiddenFiles: !state.showHiddenFiles }));
+      },
     }),
     {
       name: 'mosbot-ui-store',
-      partialize: (state) => ({ sidebarCollapsed: state.sidebarCollapsed }),
+      partialize: (state) => ({
+        sidebarCollapsed: state.sidebarCollapsed,
+        showHiddenFiles: state.showHiddenFiles,
+      }),
     },
   ),
 );
