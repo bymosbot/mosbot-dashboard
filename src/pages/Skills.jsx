@@ -78,9 +78,12 @@ export default function Skills() {
 
           // Check if the workspace path is allowed by the API
           const workspacePath = agent.workspaceRootPath || `/workspace-${agent.id}`;
-          // API allows: /workspace/, /workspace, or /workspace-<lowercase-letters>
+
+          // Skip main workspace agent - shared skills are handled separately via ROOT_PATH
+          if (workspacePath === '/workspace') return false;
+
+          // API allows: /workspace/, /workspace-<lowercase-letters>
           const isAllowed =
-            workspacePath === '/workspace' ||
             workspacePath.startsWith('/workspace/') ||
             /^\/workspace-[a-z]+(\/|$)/.test(workspacePath);
 

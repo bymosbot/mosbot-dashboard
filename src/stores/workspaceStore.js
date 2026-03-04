@@ -32,7 +32,7 @@ export const useWorkspaceStore = create((set, get) => ({
   fetchListing: async ({ path = '/', recursive = false, force = false, agentId = 'coo' }) => {
     const state = get();
     const rootPath = state.workspaceRootPath;
-    const fullPath = rootPath ? `${rootPath}${path}` : path;
+    const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
     const cacheKey = `${agentId}:${path}:${recursive}`;
 
     // Return cached if available and not forced
@@ -127,7 +127,8 @@ export const useWorkspaceStore = create((set, get) => ({
   fetchFileContent: async ({ path, force = false, agentId = 'coo', rawPath = false }) => {
     const state = get();
     const rootPath = state.workspaceRootPath;
-    const fullPath = rawPath || !rootPath ? path : `${rootPath}${path}`;
+    const fullPath =
+      rawPath || !rootPath || path.startsWith(rootPath) ? path : `${rootPath}${path}`;
     const cacheKey = `${agentId}:${path}`;
 
     // Return cached if available and not forced
@@ -249,7 +250,7 @@ export const useWorkspaceStore = create((set, get) => ({
     try {
       const state = get();
       const rootPath = state.workspaceRootPath;
-      const fullPath = rootPath ? `${rootPath}${path}` : path;
+      const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
 
       const response = await api.post('/openclaw/workspace/files', {
         path: fullPath,
@@ -275,7 +276,7 @@ export const useWorkspaceStore = create((set, get) => ({
     try {
       const state = get();
       const rootPath = state.workspaceRootPath;
-      const fullPath = rootPath ? `${rootPath}${path}` : path;
+      const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
 
       const response = await api.put('/openclaw/workspace/files', {
         path: fullPath,
@@ -302,7 +303,7 @@ export const useWorkspaceStore = create((set, get) => ({
     try {
       const state = get();
       const rootPath = state.workspaceRootPath;
-      const fullPath = rootPath ? `${rootPath}${path}` : path;
+      const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
 
       await api.delete('/openclaw/workspace/files', {
         params: { path: fullPath },
