@@ -2,7 +2,7 @@
 
 Docs is a dedicated workspace for durable system knowledge.
 
-- **Root path**: `/workspace/docs`
+- **Root path**: `/docs`
 - **Purpose**:
   - Runbooks, specs, policies, and decision records
   - Shared context for humans and agents (what to read before acting)

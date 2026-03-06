@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAgentStore } from './agentStore';
-import { getAgents } from '../api/client';
+import { api, getAgents } from '../api/client';
 import logger from '../utils/logger';
 
 vi.mock('../api/client', () => ({
+  api: {
+    get: vi.fn(),
+  },
   getAgents: vi.fn(),
 }));
 
 vi.mock('../utils/logger', () => ({
   default: {
     error: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -37,13 +41,14 @@ describe('agentStore', () => {
     expect(getAgents).not.toHaveBeenCalled();
   });
 
-  it('fetchAgents transforms workspace paths, filters archived from API, and appends constant archived', async () => {
+  it('fetchAgents transforms workspace paths and appends archived only when path exists', async () => {
     getAgents.mockResolvedValueOnce([
       { id: 'coo', workspace: '/home/node/.openclaw/workspace', isDefault: true },
       { id: 'cto', workspace: '/custom/workspace-cto' },
       { id: 'cmo' },
       { id: 'archived', workspace: '/home/node/.openclaw/workspace-old' },
     ]);
+    api.get.mockResolvedValueOnce({ data: { data: { files: [] } } });
 
     const result = await useAgentStore.getState().fetchAgents();
 
@@ -57,6 +62,41 @@ describe('agentStore', () => {
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
     expect(state.agents[state.agents.length - 1].id).toBe('archived');
+  });
+
+  it('fetchAgents does not append archived when archived path returns 404', async () => {
+    getAgents.mockResolvedValueOnce([
+      { id: 'coo', workspace: '/home/node/.openclaw/workspace', isDefault: true },
+      { id: 'cto', workspace: '/custom/workspace-cto' },
+    ]);
+    api.get.mockRejectedValueOnce({ response: { status: 404 }, message: 'Path not found' });
+
+    const result = await useAgentStore.getState().fetchAgents();
+
+    expect(result.map((a) => a.id)).toEqual(['coo', 'cto']);
+    expect(result.some((a) => a.id === 'archived')).toBe(false);
+  });
+
+  it('fetchAgents logs warning and hides archived when probe fails with non-404', async () => {
+    getAgents.mockResolvedValueOnce([{ id: 'coo', workspace: '/home/node/.openclaw/workspace' }]);
+    api.get.mockRejectedValueOnce({ response: { status: 500 }, message: 'Internal error' });
+
+    const result = await useAgentStore.getState().fetchAgents();
+
+    expect(result.map((a) => a.id)).toEqual(['coo']);
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Archived workspace probe failed, hiding archived agent',
+      expect.objectContaining({ status: 500 }),
+    );
+  });
+
+  it('fetchAgents uses fallback list and includes archived only when probe confirms it exists', async () => {
+    getAgents.mockResolvedValueOnce([]);
+    api.get.mockResolvedValueOnce({ data: { data: { files: [] } } });
+
+    const result = await useAgentStore.getState().fetchAgents();
+
+    expect(result.map((a) => a.id)).toEqual(['coo', 'cto', 'cmo', 'cpo', 'archived']);
   });
 
   it('fetchAgents falls back when API fails', async () => {
@@ -73,7 +113,7 @@ describe('agentStore', () => {
     expect(state.isLoading).toBe(false);
     expect(state.error).toBe('fetch failed');
     expect(result.length).toBeGreaterThan(1);
-    expect(result.some((agent) => agent.id === 'archived')).toBe(true);
+    expect(result.some((agent) => agent.id === 'archived')).toBe(false);
   });
 
   it('getAgentById returns requested agent, default agent, or first agent', () => {

@@ -2,6 +2,25 @@ import { create } from 'zustand';
 import { api } from '../api/client';
 import logger from '../utils/logger';
 
+const normalizeWorkspacePath = (value) => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '/';
+
+  const normalized = raw.replace(/\/+/g, '/');
+  const withLeadingSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
+  if (withLeadingSlash.length > 1 && withLeadingSlash.endsWith('/')) {
+    return withLeadingSlash.replace(/\/+$/, '');
+  }
+
+  return withLeadingSlash;
+};
+
+const joinWorkspacePath = (base, child) => {
+  const basePath = typeof base === 'string' ? base : '';
+  const childPath = typeof child === 'string' ? child : '';
+  return normalizeWorkspacePath(`${basePath}/${childPath}`);
+};
+
 export const useWorkspaceStore = create((set, get) => ({
   // Listing state
   listings: {}, // Cache keyed by `${agentId}:${path}:${recursive}`
@@ -32,7 +51,7 @@ export const useWorkspaceStore = create((set, get) => ({
   fetchListing: async ({ path = '/', recursive = false, force = false, agentId = 'coo' }) => {
     const state = get();
     const rootPath = state.workspaceRootPath;
-    const fullPath = rootPath ? `${rootPath}${path}` : path;
+    const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
     const cacheKey = `${agentId}:${path}:${recursive}`;
 
     // Return cached if available and not forced
@@ -127,7 +146,8 @@ export const useWorkspaceStore = create((set, get) => ({
   fetchFileContent: async ({ path, force = false, agentId = 'coo', rawPath = false }) => {
     const state = get();
     const rootPath = state.workspaceRootPath;
-    const fullPath = rawPath || !rootPath ? path : `${rootPath}${path}`;
+    const fullPath =
+      rawPath || !rootPath || path.startsWith(rootPath) ? path : `${rootPath}${path}`;
     const cacheKey = `${agentId}:${path}`;
 
     // Return cached if available and not forced
@@ -249,7 +269,7 @@ export const useWorkspaceStore = create((set, get) => ({
     try {
       const state = get();
       const rootPath = state.workspaceRootPath;
-      const fullPath = rootPath ? `${rootPath}${path}` : path;
+      const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
 
       const response = await api.post('/openclaw/workspace/files', {
         path: fullPath,
@@ -275,7 +295,7 @@ export const useWorkspaceStore = create((set, get) => ({
     try {
       const state = get();
       const rootPath = state.workspaceRootPath;
-      const fullPath = rootPath ? `${rootPath}${path}` : path;
+      const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
 
       const response = await api.put('/openclaw/workspace/files', {
         path: fullPath,
@@ -302,7 +322,7 @@ export const useWorkspaceStore = create((set, get) => ({
     try {
       const state = get();
       const rootPath = state.workspaceRootPath;
-      const fullPath = rootPath ? `${rootPath}${path}` : path;
+      const fullPath = rootPath && !path.startsWith(rootPath) ? `${rootPath}${path}` : path;
 
       await api.delete('/openclaw/workspace/files', {
         params: { path: fullPath },
@@ -330,22 +350,52 @@ export const useWorkspaceStore = create((set, get) => ({
 
   // Create a new directory
   createDirectory: async ({ path, agentId = 'coo' }) => {
+    const normalizedPath = normalizeWorkspacePath(path);
+    const gitkeepPath = normalizeWorkspacePath(`${normalizedPath}/.gitkeep`);
+
     try {
       const state = get();
       const rootPath = state.workspaceRootPath;
+      const fullDirectoryPath = rootPath
+        ? joinWorkspacePath(rootPath, normalizedPath)
+        : normalizedPath;
 
-      // Create directory by creating a .gitkeep file inside it
-      const gitkeepPath = `${path}/.gitkeep`;
-      const fullGitkeepPath = rootPath ? `${rootPath}${gitkeepPath}` : gitkeepPath;
+      // Fast path: if directory already exists, skip creating .gitkeep to avoid expected 409s.
+      try {
+        await api.get('/openclaw/workspace/files', {
+          params: { path: fullDirectoryPath, recursive: 'false' },
+          __suppressErrorStatuses: [404],
+        });
+        return { path: gitkeepPath, exists: true };
+      } catch (error) {
+        if (error.response?.status !== 404) {
+          const errorMessage =
+            error.response?.data?.error?.message ||
+            error.message ||
+            'Failed to check directory existence';
+          throw new Error(errorMessage);
+        }
+      }
 
-      const response = await api.post('/openclaw/workspace/files', {
-        path: fullGitkeepPath,
-        content: '',
-        encoding: 'utf8',
-      });
+      // Directory is missing, create it by writing a .gitkeep file.
+      const fullGitkeepPath = rootPath
+        ? joinWorkspacePath(rootPath, gitkeepPath)
+        : normalizeWorkspacePath(gitkeepPath);
+
+      const response = await api.post(
+        '/openclaw/workspace/files',
+        {
+          path: fullGitkeepPath,
+          content: '',
+          encoding: 'utf8',
+        },
+        {
+          __suppressErrorStatuses: [409],
+        },
+      );
 
       // Invalidate parent directory cache after successful creation
-      const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+      const parentPath = normalizedPath.substring(0, normalizedPath.lastIndexOf('/')) || '/';
       get().clearListingCache(parentPath, false, agentId);
       get().clearListingCache(parentPath, true, agentId);
 
@@ -358,7 +408,7 @@ export const useWorkspaceStore = create((set, get) => ({
         error.response?.data?.error?.message?.includes('already exists')
       ) {
         // Directory already exists, return success
-        return { path: `${path}/.gitkeep`, exists: true };
+        return { path: gitkeepPath, exists: true };
       }
 
       // For other errors, throw as before

@@ -10,7 +10,7 @@ These docs describe the **MosBot Dashboard** (the UI/control plane) and how it f
 ## What this docs folder is (and isn't)
 
 - This repo's `docs/` is **project documentation** for the dashboard (product, ops, integrations, runbooks).
-- It is **not** the same thing as the **MosBot OS "Docs" workspace** shown inside the dashboard UI (the `/workspace/docs` folder in OpenClaw workspaces).
+- It is **not** the same thing as the **MosBot OS "Docs" workspace** shown inside the dashboard UI (the `/docs` folder in OpenClaw config-root workspaces).
 - Engineering conventions for code changes live in `.cursor/rules/` (Cursor rules), not here.
 
 ## Index
@@ -29,7 +29,7 @@ These docs describe the **MosBot Dashboard** (the UI/control plane) and how it f
 - `features/kanban.md`
 - `features/task-modal.md`
 - `features/task-manager.md`
-- `features/org-chart.md`
+- `features/agent-chart.md` (Agents dashboard)
 - `features/workspaces.md`
 - `features/docs.md`
 - `features/activity-log.md`

@@ -1,31 +1,31 @@
 import { describe, it, expect } from 'vitest';
 import {
-  validateOrgChart,
+  validateAgentsConfig,
   validateOpenClawConfig,
-  syncOrgChartToOpenClaw,
-} from './orgChartValidation';
+  syncAgentsConfigToOpenClaw,
+} from './agentsConfigValidation';
 
-describe('orgChartValidation utils', () => {
-  describe('validateOrgChart', () => {
+describe('agentsConfigValidation utils', () => {
+  describe('validateAgentsConfig', () => {
     it('rejects non-object values', () => {
-      expect(validateOrgChart(null)).toEqual({
+      expect(validateAgentsConfig(null)).toEqual({
         isValid: false,
-        errors: ['Org chart must be a valid JSON object'],
+        errors: ['Agents config must be a valid JSON object'],
       });
     });
 
-    it('validates a minimal correct org chart', () => {
-      const orgChart = {
+    it('validates a minimal correct agents config', () => {
+      const config = {
         leadership: [{ id: 'ceo', title: 'CEO', label: 'agent:ceo:main', status: 'active' }],
         departments: [{ id: 'eng', name: 'Engineering', leadId: 'ceo', subagents: ['dev1'] }],
         subagents: [{ id: 'dev1', displayName: 'Dev One', label: 'agent:dev1:main' }],
       };
 
-      expect(validateOrgChart(orgChart)).toEqual({ isValid: true, errors: [] });
+      expect(validateAgentsConfig(config)).toEqual({ isValid: true, errors: [] });
     });
 
     it('reports leadership shape issues and reference errors', () => {
-      const result = validateOrgChart({
+      const result = validateAgentsConfig({
         leadership: [
           {
             id: 'ceo',
@@ -46,9 +46,7 @@ describe('orgChartValidation utils', () => {
       );
       expect(result.errors).toContain('leadership[0] (ceo): reportsTo must be a string or null');
       expect(result.errors).toContain('leadership[1]: duplicate id "ceo"');
-      expect(result.errors).toContain(
-        'leadership[1] (ceo): title is required and must be a string',
-      );
+      expect(result.errors).toContain('leadership[1] (ceo): title must be a string if provided');
       expect(result.errors).toContain(
         'leadership[1] (ceo): label is required and must be a string',
       );
@@ -57,8 +55,18 @@ describe('orgChartValidation utils', () => {
       );
     });
 
+    it('validates an agents config without title (title is optional)', () => {
+      const config = {
+        leadership: [{ id: 'bot1', label: 'agent:bot1:main', status: 'active' }],
+        departments: [],
+        subagents: [],
+      };
+
+      expect(validateAgentsConfig(config)).toEqual({ isValid: true, errors: [] });
+    });
+
     it('allows forward leadership reportsTo references', () => {
-      const result = validateOrgChart({
+      const result = validateAgentsConfig({
         leadership: [
           { id: 'cto', title: 'CTO', label: 'agent:cto:main', reportsTo: 'ceo' },
           { id: 'ceo', title: 'CEO', label: 'agent:ceo:main' },
@@ -71,7 +79,7 @@ describe('orgChartValidation utils', () => {
     });
 
     it('reports department and subagent validation errors', () => {
-      const result = validateOrgChart({
+      const result = validateAgentsConfig({
         leadership: [{ id: 'ceo', title: 'CEO', label: 'agent:ceo:main' }],
         departments: [
           { id: 'eng', name: 'Engineering', leadId: 'missing', subagents: ['unknown-subagent'] },
@@ -111,7 +119,7 @@ describe('orgChartValidation utils', () => {
     });
 
     it('reports top-level array type errors', () => {
-      const result = validateOrgChart({
+      const result = validateAgentsConfig({
         leadership: 'bad',
         departments: 'bad',
         subagents: 'bad',
@@ -155,9 +163,9 @@ describe('orgChartValidation utils', () => {
     });
   });
 
-  describe('syncOrgChartToOpenClaw', () => {
+  describe('syncAgentsConfigToOpenClaw', () => {
     it('creates/updates non-human agents and keeps humans skipped', () => {
-      const orgChart = {
+      const config = {
         leadership: [
           {
             id: 'ceo',
@@ -176,7 +184,7 @@ describe('orgChartValidation utils', () => {
         },
       };
 
-      const updated = syncOrgChartToOpenClaw(orgChart, openclaw);
+      const updated = syncAgentsConfigToOpenClaw(config, openclaw);
 
       expect(updated).not.toBe(openclaw);
       expect(updated.agents.list).toHaveLength(1);
@@ -188,7 +196,7 @@ describe('orgChartValidation utils', () => {
     });
 
     it('initializes missing agents structure and creates stub agent defaults', () => {
-      const updated = syncOrgChartToOpenClaw(
+      const updated = syncAgentsConfigToOpenClaw(
         {
           leadership: [{ id: 'cto', title: 'CTO', status: 'scaffolded', description: 'Tech lead' }],
         },
@@ -210,8 +218,33 @@ describe('orgChartValidation utils', () => {
       });
     });
 
+    it('creates stub agent from leadership entry without title', () => {
+      const updated = syncAgentsConfigToOpenClaw(
+        {
+          leadership: [
+            {
+              id: 'builder',
+              displayName: 'BuilderBot',
+              status: 'scaffolded',
+              description: 'Builds things',
+            },
+          ],
+        },
+        {},
+      );
+
+      expect(updated.agents.list).toHaveLength(1);
+      expect(updated.agents.list[0]).toMatchObject({
+        id: 'builder',
+        identity: {
+          name: 'BuilderBot',
+          theme: 'Builds things',
+        },
+      });
+    });
+
     it('normalizes non-array agents.list and creates identity when missing', () => {
-      const updated = syncOrgChartToOpenClaw(
+      const updated = syncAgentsConfigToOpenClaw(
         {
           leadership: [
             { id: 'cmo', title: 'CMO', displayName: 'Marketing Lead', status: 'active' },

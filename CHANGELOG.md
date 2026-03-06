@@ -16,12 +16,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Renamed Org Chart page to Agents
+- Simplified Agents view to remove corporate defaults and focus on single-agent display
 - Message rendering now handles both string and array content formats (blocks-based messages)
 - Tool calls are now displayed alongside message content in session detail view
 - Improved handling of assistant messages with no content or tool calls (skips empty messages)
+- Workspace agent list now shows the legacy `Archived (Old Main)` entry only when
+  `/_archived_workspace_main` exists in the workspace service
+- Dashboard no longer performs workspace symlink/link write operations on page load;
+  docs-link reconciliation is system-managed by mosbot-api + workspace-service lifecycle hooks
+- Dashboard docs updated to reflect `/docs` as the shared docs workspace root
+- Dashboard docs now consistently refer to the Agents page (replacing legacy Org Chart wording)
 - CI workflow updated to include test execution step
 - Vite config updated to support test environment
 - `.gitignore` updated to exclude additional generated files
+- Documentation references updated to align with new Agents naming
+
+### Fixed
+
+- Directory ensure flow now checks for existing workspace directories before creating `.gitkeep`, avoiding routine `409 FILE_EXISTS` responses on Docs/Projects/Skills page load
+- Workspace directory paths are now normalized before ensure/create calls to prevent duplicate or trailing slash variants (for example `/docs//.gitkeep`)
+
+### Security
+
+- Switched Gitleaks license key to an organization secret
 
 ## [0.1.4] - 2026-03-02
 

@@ -4,6 +4,9 @@ OpenClaw is the source-of-truth runtime and workspace system behind MosBot OS.
 
 The dashboard does not typically talk to OpenClaw directly; it goes via MosBot API.
 
+Docs-link bootstrap/reconciliation is also handled server-side (mosbot-api + workspace-service),
+not by dashboard page-load actions.
+
 ## Health / status semantics
 
 The dashboard surfaces a lightweight “is OpenClaw reachable?” signal for operators.

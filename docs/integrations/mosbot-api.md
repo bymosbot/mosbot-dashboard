@@ -8,6 +8,11 @@ The dashboard is a UI layer. It talks to **MosBot API**, which in turn integrate
 - **MosBot API**: authentication + authorization, normalization, proxying OpenClaw, enforcing invariants
 - **OpenClaw**: source of truth for agent/workspace configuration and runtime
 
+For workspace docs-link management:
+
+- Dashboard does not issue link/symlink bootstrap writes during page load
+- MosBot API performs system-managed docs-link reconciliation through workspace-service link resources
+
 ## Configuration
 
 The dashboard uses `VITE_API_URL` as the API base URL. See `getting-started/configuration.md`.

@@ -16,9 +16,9 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form state - merged view of org-chart.json and openclaw.json data
+  // Form state - merged view of agents.json and openclaw.json data
   const [formData, setFormData] = useState({
-    // From org-chart.json leadership
+    // From agents.json leadership
     id: '',
     title: '',
     label: '',
@@ -84,14 +84,14 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
   const loadAvailableLeaders = async () => {
     try {
       const response = await api.get('/openclaw/workspace/files/content', {
-        params: { path: '/org-chart.json' },
+        params: { path: '/agents.json' },
       });
 
-      const orgChart = JSON.parse(response.data.data.content);
-      const leaders = (orgChart.leadership || []).filter((l) => l.status !== 'human');
+      const config = JSON.parse(response.data.data.content);
+      const leaders = (config.leadership || []).filter((l) => l.status !== 'human');
       setAvailableLeaders(leaders);
     } catch (error) {
-      // If org-chart.json doesn't exist (404) or fails to parse, that's ok
+      // If agents.json doesn't exist (404) or fails to parse, that's ok
       // Just use empty list - user can still create agents without reportsTo
       if (error.response?.status !== 404) {
         logger.warn('Failed to load available leaders', { error: error.message });
@@ -128,10 +128,10 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
     setIsLoading(true);
     try {
       // Use Promise.allSettled to handle partial failures gracefully
-      const [orgChartResult, openclawResult] = await Promise.allSettled([
+      const [agentsConfigResult, openclawResult] = await Promise.allSettled([
         api
           .get('/openclaw/workspace/files/content', {
-            params: { path: '/org-chart.json' },
+            params: { path: '/agents.json' },
           })
           .catch((err) => {
             // Return null for 404s (file doesn't exist), rethrow other errors
@@ -154,17 +154,17 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
       ]);
 
       // Parse responses only if they succeeded
-      let orgChart = null;
+      let agentsConfig = null;
       let openclawConfig = null;
 
-      if (orgChartResult.status === 'fulfilled' && orgChartResult.value) {
+      if (agentsConfigResult.status === 'fulfilled' && agentsConfigResult.value) {
         try {
-          orgChart = JSON.parse(orgChartResult.value.data.data.content);
+          agentsConfig = JSON.parse(agentsConfigResult.value.data.data.content);
         } catch (parseError) {
-          logger.warn('Failed to parse org-chart.json', { error: parseError.message });
+          logger.warn('Failed to parse agents.json', { error: parseError.message });
         }
-      } else if (orgChartResult.status === 'rejected') {
-        logger.warn('Failed to load org-chart.json', { error: orgChartResult.reason?.message });
+      } else if (agentsConfigResult.status === 'rejected') {
+        logger.warn('Failed to load agents.json', { error: agentsConfigResult.reason?.message });
       }
 
       if (openclawResult.status === 'fulfilled' && openclawResult.value) {
@@ -178,7 +178,7 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
       }
 
       // If both files failed to load, show error
-      if (!orgChart && !openclawConfig) {
+      if (!agentsConfig && !openclawConfig) {
         showToast(
           'Failed to load configuration files. Please check your connection and try again.',
           'error',
@@ -187,9 +187,9 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
         return;
       }
 
-      // Find agent in org chart leadership
-      const leadershipEntry = orgChart
-        ? (orgChart.leadership || []).find((l) => l.id === agentId)
+      // Find agent in agents config leadership
+      const leadershipEntry = agentsConfig
+        ? (agentsConfig.leadership || []).find((l) => l.id === agentId)
         : null;
 
       // Find agent in openclaw config
@@ -205,7 +205,7 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
 
       // Merge data from both sources
       setFormData({
-        // Org chart data
+        // Agents config data
         id: leadershipEntry?.id || agentId,
         title: leadershipEntry?.title || '',
         label: leadershipEntry?.label || `mosbot-${agentId}`,
@@ -254,11 +254,6 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
       return;
     }
 
-    if (!formData.title.trim()) {
-      showToast('Title is required', 'error');
-      return;
-    }
-
     if (!formData.displayName.trim()) {
       showToast('Display name is required', 'error');
       return;
@@ -267,7 +262,7 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
     setIsSaving(true);
 
     try {
-      // Build payload for the API - the server handles both org-chart.json and openclaw.json
+      // Build payload for the API - the server handles both agents.json and openclaw.json
       const payload = {
         id: formData.id,
         title: formData.title,
@@ -295,9 +290,9 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
 
       let response;
       if (isCreateMode) {
-        response = await api.post('/openclaw/org-chart/agents', payload);
+        response = await api.post('/openclaw/agents/config', payload);
       } else {
-        response = await api.put(`/openclaw/org-chart/agents/${formData.id}`, payload);
+        response = await api.put(`/openclaw/agents/config/${formData.id}`, payload);
       }
 
       const result = response.data?.data;
@@ -384,24 +379,22 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
                         value={formData.id}
                         onChange={(e) => handleChange('id', e.target.value)}
                         disabled={!isCreateMode || isSaving}
-                        placeholder="e.g., coo, cto, cmo"
+                        placeholder="e.g., orchestrator, researcher, builder"
                         className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <p className="text-xs text-dark-500 mt-1">
-                        Lowercase, no spaces (e.g., coo, cto)
+                        Lowercase, no spaces (e.g., orchestrator, builder)
                       </p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-dark-300 mb-2">
-                        Title <span className="text-red-400">*</span>
-                      </label>
+                      <label className="block text-sm font-medium text-dark-300 mb-2">Title</label>
                       <input
                         type="text"
                         value={formData.title}
                         onChange={(e) => handleChange('title', e.target.value)}
                         disabled={isSaving}
-                        placeholder="e.g., COO, CTO, CMO"
+                        placeholder="e.g., Orchestrator, Engineer, Researcher"
                         className="input-field w-full disabled:opacity-50"
                       />
                     </div>
@@ -415,7 +408,7 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
                         value={formData.displayName}
                         onChange={(e) => handleChange('displayName', e.target.value)}
                         disabled={isSaving}
-                        placeholder="e.g., MosBot, Elon, Gary"
+                        placeholder="e.g., MosBot, ResearchBot, BuilderBot"
                         className="input-field w-full disabled:opacity-50"
                       />
                     </div>
@@ -427,7 +420,7 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
                         value={formData.label}
                         onChange={(e) => handleChange('label', e.target.value)}
                         disabled={isSaving}
-                        placeholder="e.g., mosbot-coo"
+                        placeholder="e.g., mosbot-orchestrator"
                         className="input-field w-full disabled:opacity-50"
                       />
                     </div>
@@ -502,7 +495,7 @@ export default function AgentEditModal({ isOpen, onClose, onSave, agentId = null
                             value={formData.workspace}
                             onChange={(e) => handleChange('workspace', e.target.value)}
                             disabled={isSaving}
-                            placeholder="/home/node/.openclaw/workspace-coo"
+                            placeholder="/home/node/.openclaw/workspace-myagent"
                             className="input-field w-full disabled:opacity-50"
                           />
                         </div>

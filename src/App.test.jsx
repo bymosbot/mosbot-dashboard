@@ -82,11 +82,13 @@ describe('App', () => {
   });
 
   it('fetches agents on mount when agents list is empty', () => {
+    authState.isAuthenticated = true;
     render(<App />);
     expect(mockFetchAgents).toHaveBeenCalled();
   });
 
   it('does not fetch agents when agents list is not empty', () => {
+    authState.isAuthenticated = true;
     agentState.agents = [{ id: 'coo', name: 'MosBot' }];
 
     render(<App />);

@@ -75,7 +75,7 @@ export default function Sidebar({ onCloseMobile, collapsed = false }) {
     {
       label: 'Org',
       items: [
-        { name: 'Org Chart', href: '/org-chart', icon: ChartBarIcon },
+        { name: 'Agents', href: '/agents', icon: ChartBarIcon },
         {
           name: 'Workspaces',
           href: `/workspaces/${getDefaultAgent()?.id || 'coo'}`,

@@ -9,6 +9,7 @@ import {
   ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
 import { classNames } from '../utils/helpers';
+import { useUIStore } from '../stores/uiStore';
 
 function sortFiles(files) {
   return [...files].sort((a, b) => {
@@ -42,11 +43,15 @@ function TreeNode({
   const isSymlink = node.isSymlink === true;
   const isExpanded = expandedPaths.has(node.path);
 
+  const { showHiddenFiles } = useUIStore();
+
   const children = useMemo(() => {
     if (!isDirectory || !isExpanded) return [];
     const cached = childrenCache[node.path];
-    return cached ? sortFiles(cached) : [];
-  }, [isDirectory, isExpanded, childrenCache, node.path]);
+    if (!cached) return [];
+    const visible = showHiddenFiles ? cached : cached.filter((f) => !f.name.startsWith('.'));
+    return sortFiles(visible);
+  }, [isDirectory, isExpanded, childrenCache, node.path, showHiddenFiles]);
 
   const hasChildren = children.length > 0;
 

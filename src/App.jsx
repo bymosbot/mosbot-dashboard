@@ -7,12 +7,12 @@ import ToastContainer from './components/ToastContainer';
 import Login from './pages/Login';
 import TaskManagerOverview from './pages/TaskManagerOverview';
 import KanbanPage from './pages/KanbanPage';
-import OrgChart from './pages/OrgChart';
+import Agents from './pages/Agents';
 import Workspace from './pages/Workspace';
 import Docs from './pages/Docs';
 import Projects from './pages/Projects';
 import Skills from './pages/Skills';
-// import Subagents from './pages/Subagents'; // Hidden: Task Manager + Org Chart cover this; re-enable if needed
+// import Subagents from './pages/Subagents'; // Hidden: Task Manager + Agents page cover this; re-enable if needed
 import CronJobs from './pages/CronJobs';
 import Log from './pages/Log';
 import Archived from './pages/Archived';
@@ -27,21 +27,22 @@ import { useAgentStore } from './stores/agentStore';
 
 function App() {
   const initialize = useAuthStore((state) => state.initialize);
-  const isInitialized = useAuthStore((state) => state.isInitialized);
+  const isAuthInitialized = useAuthStore((state) => state.isInitialized);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { fetchAgents, getDefaultAgent, agents } = useAgentStore();
 
   useEffect(() => {
-    if (!isInitialized) {
+    if (!isAuthInitialized) {
       initialize();
     }
-  }, [initialize, isInitialized]);
+  }, [initialize, isAuthInitialized]);
 
   // Fetch agents on mount for auto-discovery
   useEffect(() => {
-    if (agents.length === 0) {
+    if (isAuthInitialized && isAuthenticated && agents.length === 0) {
       fetchAgents();
     }
-  }, [agents.length, fetchAgents]);
+  }, [isAuthInitialized, isAuthenticated, agents.length, fetchAgents]);
 
   return (
     <ErrorBoundary>
@@ -72,10 +73,10 @@ function App() {
               }
             />
             <Route
-              path="/org-chart"
+              path="/agents"
               element={
                 <Layout>
-                  <OrgChart />
+                  <Agents />
                 </Layout>
               }
             />
@@ -84,7 +85,6 @@ function App() {
             <Route path="/kanban" element={<Navigate to="/tasks" replace />} />
             <Route path="/tasks/overview" element={<Navigate to="/monitor" replace />} />
             <Route path="/tasks/kanban" element={<Navigate to="/tasks" replace />} />
-            <Route path="/tasks/org-chart" element={<Navigate to="/org-chart" replace />} />
             <Route
               path="/docs/*"
               element={

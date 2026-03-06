@@ -101,19 +101,19 @@ const EVENT_META = {
     badge: 'text-red-400 bg-red-500/10 border-red-500/20',
     label: 'Workspace',
   },
-  org_chart_agent_created: {
+  agent_created: {
     icon: UserGroupIcon,
     color: 'text-violet-400',
     dot: 'bg-violet-500',
     badge: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
-    label: 'Org',
+    label: 'Agents',
   },
-  org_chart_agent_updated: {
+  agent_updated: {
     icon: UserGroupIcon,
     color: 'text-violet-400',
     dot: 'bg-violet-500',
     badge: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
-    label: 'Org',
+    label: 'Agents',
   },
   cron_job_created: {
     icon: BoltIcon,

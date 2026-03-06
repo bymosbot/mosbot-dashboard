@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getAgents } from '../api/client';
+import { api, getAgents } from '../api/client';
 import logger from '../utils/logger';
 
 // Archived workspace agent - temporary access to archived files
@@ -11,6 +11,28 @@ const archivedAgent = {
   workspaceRootPath: '/_archived_workspace_main',
   icon: '📦',
   isDefault: false,
+};
+
+const hasArchivedWorkspace = async () => {
+  try {
+    await api.get('/openclaw/workspace/files', {
+      params: {
+        path: archivedAgent.workspaceRootPath,
+        recursive: 'false',
+      },
+    });
+    return true;
+  } catch (error) {
+    if (error?.response?.status === 404) {
+      return false;
+    }
+
+    logger.warn('Archived workspace probe failed, hiding archived agent', {
+      status: error?.response?.status,
+      message: error?.message,
+    });
+    return false;
+  }
 };
 
 // Fallback agents if API fails or returns empty
@@ -51,7 +73,6 @@ const fallbackAgents = [
     icon: '💡',
     isDefault: false,
   },
-  archivedAgent,
 ];
 
 export const useAgentStore = create((set, get) => ({
@@ -97,22 +118,30 @@ export const useAgentStore = create((set, get) => ({
         };
       });
 
-      // Filter out API version if present, use our constant
+      // Filter out API version if present, then conditionally append archived
       agents = agents.filter((a) => a.id !== 'archived');
-
-      // Append Archived at the end
-      agents = [...agents, archivedAgent];
+      const archivedAvailable = await hasArchivedWorkspace();
+      const baseAgents = agents.length > 0 ? agents : fallbackAgents;
+      const finalAgents = archivedAvailable ? [...baseAgents, archivedAgent] : baseAgents;
 
       set({
-        agents: agents.length > 0 ? agents : fallbackAgents,
+        agents: finalAgents,
         isLoading: false,
         error: null,
         isInitialized: true,
       });
 
-      return agents;
+      return finalAgents;
     } catch (error) {
-      logger.error('Failed to fetch agents, using fallback', error);
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        logger.warn('Failed to fetch agents due to authorization, using fallback', {
+          status,
+          message: error?.message,
+        });
+      } else {
+        logger.error('Failed to fetch agents, using fallback', error);
+      }
 
       set({
         agents: fallbackAgents,

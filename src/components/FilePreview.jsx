@@ -23,6 +23,11 @@ import {
 } from '../utils/helpers';
 import logger from '../utils/logger';
 
+function extractAgentIdFromPath(filePath) {
+  const match = filePath.match(/^\/workspace-([^/]+)\//);
+  return match ? match[1] : null;
+}
+
 export default function FilePreview({
   file,
   agentId = 'coo',
@@ -112,12 +117,14 @@ export default function FilePreview({
   useEffect(() => {
     if (file && file.type === 'file' && !content) {
       setIsAccessDenied(false);
-      // If file has a fullPath it's an agent-only file whose path is already
-      // absolute — skip the workspaceRootPath prefix in the store.
-      // Use the agentId from the file object if available (for agent-only files),
-      // otherwise use the prop agentId
-      const fileAgentId = file.agentId || agentId;
-      const rawPath = !!file.fullPath;
+      // If file has a fullPath or its path starts with /workspace-, it's an
+      // agent-only file whose path is already absolute — skip the
+      // workspaceRootPath prefix in the store.
+      const isWorkspacePath =
+        file.path.startsWith('/workspace-') || file.path.startsWith('/workspace/');
+      const fileAgentId =
+        file.agentId || (isWorkspacePath ? extractAgentIdFromPath(file.path) : null) || agentId;
+      const rawPath = !!file.fullPath || isWorkspacePath;
       fetchFileContent({ path: file.path, agentId: fileAgentId, rawPath }).catch((error) => {
         // Check if this is a 404 Not Found error (file doesn't exist)
         const is404Error = error.response?.status === 404;
@@ -222,12 +229,14 @@ export default function FilePreview({
       });
 
       // Refetch the file content to show the updated version
-      const fileAgentId = file.agentId || agentId;
+      const isWsPath = file.path.startsWith('/workspace-') || file.path.startsWith('/workspace/');
+      const fileAgentId =
+        file.agentId || (isWsPath ? extractAgentIdFromPath(file.path) : null) || agentId;
       await fetchFileContent({
         path: file.path,
         force: true,
         agentId: fileAgentId,
-        rawPath: !!file.fullPath,
+        rawPath: !!file.fullPath || isWsPath,
       });
 
       // Refetch parent directory listing to update the UI

@@ -42,14 +42,6 @@ export const agentWorkspaces = [
     workspaceRootPath: '/workspace-cpo',
     icon: '💡',
   },
-  {
-    id: 'archived',
-    name: 'Archived',
-    label: 'Archived (Old Main)',
-    description: 'Archived workspace files from previous iteration',
-    workspaceRootPath: '/_archived_workspace_main',
-    icon: '📦',
-  },
 ];
 
 // Helper to get agent by ID

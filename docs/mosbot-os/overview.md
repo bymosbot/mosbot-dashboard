@@ -23,7 +23,7 @@ If you’re operating MosBot OS, you’ll spend nearly all your time in:
 
 - **Kanban** (work state and prioritization)
 - **Task Manager** (runtime visibility: sessions/metrics + cron jobs)
-- **Org Chart** (system structure and capability map)
+- **Agents** (system structure and capability map)
 - **Workspaces + Docs** (shared artifacts and durable knowledge)
 - **Activity Log** (narrative timeline across the system)
 
@@ -38,7 +38,7 @@ MosBot OS is organized into these main pages in the sidebar:
 
 - **Task Manager** (Overview)
 - **Kanban**
-- **Org Chart**
+- **Agents**
 - **Workspaces**
 - **Docs**
 - **Activity Log**
@@ -50,7 +50,7 @@ MosBot OS is organized into these main pages in the sidebar:
 - `features/task-manager.md`
 - `features/kanban.md`
 - `features/task-modal.md`
-- `features/org-chart.md`
+- `features/agent-chart.md` (Agents)
 - `features/workspaces.md`
 - `features/docs.md`
 - `features/activity-log.md`
@@ -79,7 +79,7 @@ Keep MosBot OS legible for humans:
 - **Task**: the durable unit of work in MosBot OS
 - **Kanban**: the status pipeline view of tasks
 - **Task Manager**: runtime/operations view (sessions + metrics + cron jobs)
-- **Org Chart**: system structure and capability map
+- **Agents**: system structure and capability map
 - **Workspace**: browsable shared filesystem view, permissioned by role
-- **Docs**: shared documentation workspace at `/workspace/docs`
+- **Docs**: shared documentation workspace at `/docs`
 - **Activity Log**: chronological narrative stream of actions/events

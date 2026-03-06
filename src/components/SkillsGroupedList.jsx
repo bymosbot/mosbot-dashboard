@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { classNames } from '../utils/helpers';
 import { useAgentStore } from '../stores/agentStore';
+import { useUIStore } from '../stores/uiStore';
 
 /**
  * Groups skills into Shared Skills and Agent-Only Skills sections.
@@ -64,16 +65,19 @@ function SkillItem({
   const isLoading = loadingPaths?.has(file.path);
   const isExpanded = expandedPaths.has(file.path);
 
+  const { showHiddenFiles } = useUIStore();
+
   const children = useMemo(() => {
     if (!isDirectory || !isExpanded || !childrenCache) return [];
     const cached = childrenCache[file.path];
     if (!cached) return [];
-    return [...cached].sort((a, b) => {
+    const visible = showHiddenFiles ? cached : cached.filter((f) => !f.name.startsWith('.'));
+    return [...visible].sort((a, b) => {
       if (a.type === 'directory' && b.type !== 'directory') return -1;
       if (a.type !== 'directory' && b.type === 'directory') return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [isDirectory, isExpanded, childrenCache, file.path]);
+  }, [isDirectory, isExpanded, childrenCache, file.path, showHiddenFiles]);
 
   const handleClick = (e) => {
     e.preventDefault();
@@ -252,11 +256,15 @@ export default function SkillsGroupedList({
   onToggleExpand,
 }) {
   const { agents } = useAgentStore();
+  const { showHiddenFiles } = useUIStore();
 
   const filteredFiles = useMemo(() => {
-    if (!searchQuery.trim()) return files;
-    return files.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [files, searchQuery]);
+    return files.filter((file) => {
+      if (!showHiddenFiles && file.name.startsWith('.')) return false;
+      if (!searchQuery.trim()) return true;
+      return file.name.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+  }, [files, searchQuery, showHiddenFiles]);
 
   const { shared, agentOnlyByAgent } = useMemo(() => {
     return groupSkills(filteredFiles, agents);
